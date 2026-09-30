@@ -1,0 +1,47 @@
+# DRAFT — illustrative, schema not final.
+type: feature
+columns: [backlog, spec, design, plan, implement, review, docs, done]
+
+steps:
+  spec:
+    agent: claude
+    mode: read-only
+    prompt: ./prompts/spec.md
+    gate: human
+    outputs: [handover]
+
+  design:
+    agent: claude
+    mode: read-only
+    consult: [codex, gemini]   # auto-asks for critique in the same thread
+    prompt: ./prompts/design.md
+    gate: human
+    outputs: [handover]        # includes decision record: chosen / rejected / why
+
+  plan:
+    agent: codex
+    mode: read-only
+    prompt: ./prompts/plan.md
+    gate: auto
+    outputs: [handover]
+
+  implement:
+    agent: claude
+    mode: write
+    prompt: ./prompts/implement.md
+    gate: checks
+    outputs: [handover]
+
+  review:
+    agent: codex
+    mode: read-only
+    prompt: ./prompts/review.md
+    gate: human
+    outputs: [handover]
+
+  docs:
+    agent: claude
+    mode: read-only
+    prompt: ../_shared/docs-steward.md
+    gate: human
+    outputs: [doc_proposal]

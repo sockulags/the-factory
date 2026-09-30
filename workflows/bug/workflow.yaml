@@ -1,0 +1,39 @@
+# DRAFT — illustrative, schema not final.
+type: bug
+columns: [backlog, triage, reproduce, fix, review, docs, done]
+
+steps:
+  triage:
+    agent: claude
+    mode: read-only
+    prompt: ./prompts/triage.md
+    gate: human            # human confirms severity/scope before work starts
+    outputs: [handover]
+
+  reproduce:
+    agent: codex
+    mode: write            # may add a failing test
+    prompt: ./prompts/reproduce.md
+    gate: checks           # the new test must fail for the right reason
+    outputs: [handover]
+
+  fix:
+    agent: claude
+    mode: write
+    prompt: ./prompts/fix.md
+    gate: checks           # tests + lint green
+    outputs: [handover]
+
+  review:
+    agent: codex           # a different provider than the one that wrote the fix
+    mode: read-only
+    prompt: ./prompts/review.md
+    gate: human
+    outputs: [handover]
+
+  docs:
+    agent: claude
+    mode: read-only
+    prompt: ../_shared/docs-steward.md
+    gate: human            # human approves the doc diff
+    outputs: [doc_proposal]
