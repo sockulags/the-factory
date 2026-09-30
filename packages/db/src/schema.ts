@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   jsonb,
   pgTable,
@@ -176,5 +177,36 @@ export const docProposals = pgTable("doc_proposals", {
   status: text("status").notNull().default("pending"),
   reviewedBy: text("reviewed_by"),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Which integrations a product uses, and their settings. Secrets are env var names, never values. */
+export const pluginConfigs = pgTable(
+  "plugin_configs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    plugin: text("plugin").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("plugin_configs_product_plugin").on(t.productId, t.plugin)],
+);
+
+/** Things in other systems a card is linked to: pull requests, issues, pages. */
+export const externalLinks = pgTable("external_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  cardId: uuid("card_id")
+    .notNull()
+    .references(() => cards.id, { onDelete: "cascade" }),
+  plugin: text("plugin").notNull(),
+  /** e.g. pull_request, merge_request, issue */
+  kind: text("kind").notNull(),
+  ref: text("ref").notNull(),
+  url: text("url").notNull(),
+  title: text("title"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

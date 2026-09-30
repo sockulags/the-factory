@@ -1,6 +1,6 @@
 # The Factory — Plan
 
-Status: draft, living document. Last updated 2026-09-30 (rev 9).
+Status: draft, living document. Last updated 2026-09-30 (rev 10).
 
 ## 1. What we're building
 
@@ -298,8 +298,11 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
    changes (continues the thread, same base) or discard (reverted). Approved
    write steps commit to the card branch. Prompts get `{{docs.index}}` and the
    most relevant pages (`{{docs.relevant}}`).
-6. **Plugins.** Plugin interface; first plugin = GitHub or GitLab (open PR on
-   done), then Jira/Confluence.
+6. **Plugins.** ✅ *Built.* Per-product plugins with hooks, agent tools
+   (MCP servers) and instructions; secrets referenced by env var name. Built-in:
+   GitHub and GitLab (`vcs.open_pr`: push + PR/MR + card link), MCP (e.g.
+   Jira/Confluence via Atlassian's MCP server), instructions, webhook. See
+   [plugins.md](plugins.md).
 7. **Team & ops.** Roles, multi-product views, usage dashboards, k8s
    deployment (runner as pod, worktrees on volumes), desktop runner mode.
 

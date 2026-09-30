@@ -42,7 +42,7 @@ export interface DesktopBridge {
   api<T = unknown>(path: string): Promise<T>;
   /** Authenticated request against the server's /api. Rejects with the server's error detail. */
   request<T = unknown>(
-    method: "GET" | "POST" | "PATCH" | "DELETE",
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: string,
     body?: unknown,
   ): Promise<T>;

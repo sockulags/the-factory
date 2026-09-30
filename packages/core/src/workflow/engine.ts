@@ -22,12 +22,13 @@ export const DOCS_DIR = "docs";
 /** A request that isn't valid in the card's current state. Reported to the caller. */
 export class WorkflowError extends Error {}
 
-/** A named action workflows can run on step enter/exit (plugins register these, phase 6). */
+/** A named action workflows can run on step enter/exit; plugins provide them. */
 export type Hook = (ctx: {
   card: Card;
   step: StepDefinition;
   repo: Repo | null;
-  engine: WorkflowEngine;
+  board: Board;
+  runner: Runner;
 }) => Promise<Record<string, unknown> | undefined>;
 
 export interface WorkflowEngineOptions {
@@ -37,7 +38,12 @@ export interface WorkflowEngineOptions {
   workflows: Map<string, WorkflowDefinition>;
   /** Where card worktrees are created: <worktreesDir>/<card-key>. */
   worktreesDir: string;
+  /** Hooks available to every product (tests, built-ins). */
   hooks?: Record<string, Hook>;
+  /** Hooks from the card's product's plugins. */
+  resolveHook?: (card: Card, name: string) => Promise<Hook | null>;
+  /** Product instructions (plugins) prepended to each step's first prompt. */
+  instructionsFor?: (card: Card) => Promise<string>;
   /** Notified whenever a card changes (board live updates). */
   onCardChange?: (cardId: string) => void;
 }
@@ -243,6 +249,8 @@ export class WorkflowEngine {
         step: step.id,
       });
       message = await this.renderStepPrompt(card, step, repo, input);
+      const instructions = await this.options.instructionsFor?.(card);
+      if (instructions) message = `${message}\n\n## Product instructions\n${instructions}`;
     } else {
       message = input ?? "Continue with this step.";
     }
@@ -558,15 +566,22 @@ export class WorkflowEngine {
     phase: "enter" | "exit",
   ) {
     for (const name of step.hooks[phase]) {
-      const hook = this.options.hooks?.[name];
+      const hook =
+        this.options.hooks?.[name] ?? (await this.options.resolveHook?.(card, name)) ?? null;
       if (!hook) {
         await this.options.board.addEvent(card.id, "hook_skipped", "system", {
           hook: name,
-          reason: "no plugin provides this hook",
+          reason: "no enabled plugin provides this hook",
         });
         continue;
       }
-      const result = await hook({ card, step, repo, engine: this });
+      const result = await hook({
+        card,
+        step,
+        repo,
+        board: this.options.board,
+        runner: this.options.runner,
+      });
       await this.options.board.addEvent(card.id, "hook_ran", "system", {
         hook: name,
         phase,

@@ -2,7 +2,8 @@ import { type Db, schema } from "@factory/db";
 import { and, asc, desc, eq, max } from "drizzle-orm";
 import { type HandoverContent, handoverToMarkdown } from "./workflow/handover.js";
 
-const { products, repos, cards, cardEvents, handovers, threads, docProposals } = schema;
+const { products, repos, cards, cardEvents, handovers, threads, docProposals, externalLinks } =
+  schema;
 
 export type Product = typeof products.$inferSelect;
 export type Repo = typeof repos.$inferSelect;
@@ -10,6 +11,7 @@ export type CardRow = typeof cards.$inferSelect;
 export type Card = CardRow & { key: string };
 export type CardEvent = typeof cardEvents.$inferSelect;
 export type DocProposal = typeof docProposals.$inferSelect;
+export type ExternalLink = typeof externalLinks.$inferSelect;
 export type HandoverRow = Omit<typeof handovers.$inferSelect, "content"> & {
   content: HandoverContent;
 };
@@ -314,6 +316,35 @@ export class Board {
       .from(docProposals)
       .where(eq(docProposals.cardId, cardId))
       .orderBy(asc(docProposals.createdAt));
+  }
+
+  /** Links a card to something in another system; idempotent per (plugin, kind, ref). */
+  async addLink(input: {
+    cardId: string;
+    plugin: string;
+    kind: string;
+    ref: string;
+    url: string;
+    title?: string | null;
+  }) {
+    const existing = (await this.links(input.cardId)).find(
+      (l) => l.plugin === input.plugin && l.kind === input.kind && l.ref === input.ref,
+    );
+    if (existing) return existing;
+    const [row] = await this.db
+      .insert(externalLinks)
+      .values({ ...input, title: input.title ?? null })
+      .returning();
+    if (!row) throw new Error("failed to add link");
+    return row;
+  }
+
+  links(cardId: string): Promise<ExternalLink[]> {
+    return this.db
+      .select()
+      .from(externalLinks)
+      .where(eq(externalLinks.cardId, cardId))
+      .orderBy(asc(externalLinks.createdAt));
   }
 
   private async withKey(row: CardRow): Promise<Card> {

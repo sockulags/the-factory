@@ -1,5 +1,5 @@
 import type { Card, CardEvent, HandoverRow, Thread, ThreadEvent } from "@factory/core";
-import { WorkflowError } from "@factory/core";
+import { PluginError, WorkflowError } from "@factory/core";
 import type {
   CardDetailDto,
   CardDto,
@@ -87,7 +87,7 @@ export function factoryRoutes(f: FactoryServices) {
   api.onError((err, c) => {
     if (err instanceof NotFound)
       return c.json({ error: "not_found", detail: `${err.message} not found` }, 404);
-    if (err instanceof WorkflowError || err instanceof BadRequest) {
+    if (err instanceof WorkflowError || err instanceof BadRequest || err instanceof PluginError) {
       return c.json({ error: "bad_request", detail: err.message }, 400);
     }
     if (err instanceof z.ZodError) {
@@ -159,6 +159,26 @@ export function factoryRoutes(f: FactoryServices) {
     return c.json(repoDto(await f.board.addRepo({ productId: c.req.param("id"), ...body })), 201);
   });
 
+  // ── Plugins ────────────────────────────────────────────────────
+  api.get("/plugins", (c) =>
+    c.json(
+      f.plugins.list().map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        exampleConfig: p.exampleConfig,
+      })),
+    ),
+  );
+  api.get("/products/:id/plugins", async (c) => c.json(await f.plugins.configs(c.req.param("id"))));
+  api.put("/products/:id/plugins/:plugin", async (c) => {
+    const body = z
+      .object({ enabled: z.boolean(), config: z.record(z.string(), z.unknown()).default({}) })
+      .parse(await c.req.json());
+    if (!(await f.board.getProduct(c.req.param("id")))) throw new NotFound("product");
+    return c.json(await f.plugins.configure(c.req.param("id"), c.req.param("plugin"), body));
+  });
+
   // ── Cards ──────────────────────────────────────────────────────
   api.get("/products/:id/cards", async (c) =>
     c.json((await f.board.listCards(c.req.param("id"))).map(cardDto)),
@@ -205,6 +225,14 @@ export function factoryRoutes(f: FactoryServices) {
         outsideDocs: p.outsideDocs,
         reviewedBy: p.reviewedBy,
         createdAt: iso(p.createdAt),
+      })),
+      links: (await f.board.links(card.id)).map((l) => ({
+        id: l.id,
+        plugin: l.plugin,
+        kind: l.kind,
+        ref: l.ref,
+        url: l.url,
+        title: l.title,
       })),
     };
     return c.json(detail);

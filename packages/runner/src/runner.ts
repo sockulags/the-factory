@@ -1,4 +1,4 @@
-import type { SessionUpdate } from "@agentclientprotocol/sdk";
+import type { McpServer, SessionUpdate } from "@agentclientprotocol/sdk";
 import { AgentProcess, type TurnResult } from "./agent-process.js";
 import type { AgentSpec } from "./agents.js";
 import { type DocFile, readDocs } from "./docs.js";
@@ -12,6 +12,9 @@ import {
   diffSummary,
   ensureWorktree,
   isGitRepo,
+  type PushAuth,
+  pushBranch,
+  remoteUrl,
   removeWorktree,
   restorePaths,
 } from "./git.js";
@@ -32,6 +35,8 @@ export interface OpenSessionRequest {
   mode: SessionMode;
   /** Provider session to reattach to, if the thread has one for this agent. */
   existingSessionId?: string | null;
+  /** Tools for the agent (from plugins), e.g. an issue tracker's MCP server. */
+  mcpServers?: McpServer[];
 }
 
 /**
@@ -77,6 +82,9 @@ export interface Runner {
   /** Restores `paths` to their state in snapshot `source` (removes files added since). */
   restorePaths(cwd: string, source: string, paths: string[]): Promise<void>;
   readDocs(cwd: string, dir?: string): Promise<DocFile[]>;
+  /** Pushes a branch to a remote (URL or path), optionally with HTTP basic credentials. */
+  push(cwd: string, remote: string, branch: string, auth?: PushAuth): Promise<void>;
+  remoteUrl(cwd: string, name?: string): Promise<string | null>;
   shutdown(): Promise<void>;
 }
 
@@ -91,7 +99,13 @@ export class LocalRunner implements Runner {
     private readonly options: { env?: NodeJS.ProcessEnv } = {},
   ) {}
 
-  async openSession({ agentId, cwd, mode, existingSessionId }: OpenSessionRequest) {
+  async openSession({
+    agentId,
+    cwd,
+    mode,
+    existingSessionId,
+    mcpServers = [],
+  }: OpenSessionRequest) {
     const agent = await this.process(agentId);
     const live = this.live(agentId);
     if (existingSessionId && live.has(existingSessionId)) {
@@ -102,12 +116,12 @@ export class LocalRunner implements Runner {
       const caps = agent.init.agentCapabilities ?? {};
       try {
         if (caps.loadSession) {
-          await agent.loadSession(existingSessionId, cwd, mode);
+          await agent.loadSession(existingSessionId, cwd, mode, mcpServers);
           live.add(existingSessionId);
           return { sessionId: existingSessionId, origin: "loaded" as const };
         }
         if (caps.sessionCapabilities?.resume) {
-          await agent.resumeSession(existingSessionId, cwd, mode);
+          await agent.resumeSession(existingSessionId, cwd, mode, mcpServers);
           live.add(existingSessionId);
           return { sessionId: existingSessionId, origin: "resumed" as const };
         }
@@ -115,7 +129,7 @@ export class LocalRunner implements Runner {
         // Session is gone on the provider side (expired, deleted, other machine): start fresh.
       }
     }
-    const { sessionId } = await agent.newSession(cwd, mode);
+    const { sessionId } = await agent.newSession(cwd, mode, mcpServers);
     live.add(sessionId);
     return { sessionId, origin: "new" as const };
   }
@@ -181,6 +195,14 @@ export class LocalRunner implements Runner {
 
   readDocs(cwd: string, dir?: string): Promise<DocFile[]> {
     return readDocs(cwd, dir);
+  }
+
+  push(cwd: string, remote: string, branch: string, auth?: PushAuth): Promise<void> {
+    return pushBranch(cwd, remote, branch, auth);
+  }
+
+  remoteUrl(cwd: string, name?: string): Promise<string | null> {
+    return remoteUrl(cwd, name);
   }
 
   async shutdown(): Promise<void> {

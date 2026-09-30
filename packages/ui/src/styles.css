@@ -635,3 +635,32 @@ ul.plain {
 .diff .meta {
   color: var(--muted);
 }
+.integrations {
+  display: grid;
+  gap: 10px;
+}
+.plugin {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.plugin header {
+  justify-content: space-between;
+}
+.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+.ok {
+  color: var(--ok);
+}
+.link-chip {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 1px 8px;
+  text-decoration: none;
+}
