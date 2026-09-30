@@ -63,3 +63,16 @@ jobs:
           file: deploy/server.Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+      - id: runner-meta
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}-runner"
+          version="${GITHUB_REF_NAME#v}"
+          tags="$image:$version"
+          if [[ "$version" != *-* ]]; then tags="$tags,$image:latest"; fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/runner.Dockerfile
+          push: true
+          tags: ${{ steps.runner-meta.outputs.tags }}

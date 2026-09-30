@@ -1,0 +1,57 @@
+# The runner: agent processes (with the team's CLI logins) and card worktrees.
+# One replica: worktrees and sessions live on its volumes.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: factory-runner
+spec:
+  serviceName: factory-runner
+  replicas: 1
+  selector:
+    matchLabels: { app: factory-runner }
+  template:
+    metadata:
+      labels: { app: factory-runner }
+    spec:
+      securityContext:
+        fsGroup: 1000 # node user
+      containers:
+        - name: runner
+          image: factory-runner
+          ports:
+            - containerPort: 8788
+          env:
+            - name: RUNNER_TOKEN
+              valueFrom:
+                secretKeyRef: { name: factory-secrets, key: RUNNER_TOKEN }
+          volumeMounts:
+            - { name: repos, mountPath: /repos }
+            - { name: data, mountPath: /data }
+            - { name: agent-home, mountPath: /home/node }
+          readinessProbe:
+            httpGet: { path: /health, port: 8788 }
+          resources:
+            requests: { cpu: "1", memory: 2Gi }
+  volumeClaimTemplates:
+    - metadata: { name: repos }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 20Gi } }
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 50Gi } }
+    - metadata: { name: agent-home }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: 5Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: factory-runner
+spec:
+  selector: { app: factory-runner }
+  ports:
+    - port: 8788
+      targetPort: 8788

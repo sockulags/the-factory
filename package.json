@@ -12,6 +12,7 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "dev:server": "pnpm --filter @factory/server dev",
+    "dev:runner": "pnpm --filter @factory/runner-service dev",
     "dev:ui": "pnpm --filter @factory/ui dev",
     "dev:desktop": "pnpm --filter @factory/desktop dev",
     "probe": "pnpm --filter @factory/runner probe",

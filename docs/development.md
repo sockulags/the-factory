@@ -4,6 +4,7 @@
 
 ```
 apps/server      Hono API server: auth (Keycloak/OIDC), client config, update feed
+apps/runner      Runner service: agents + worktrees behind the runner protocol
 apps/desktop     Electron app: main process (auth, updates, IPC) + preload bridge
 packages/runner  ACP client host: spawns agents, permission policy, checkpoints, probe/chat CLI
 packages/core    Threads (event log, cursors, deltas), board store, workflow engine, CLIs
@@ -146,6 +147,14 @@ first install. For Azure Trusted Signing, add `win.azureSignOptions` to
 cp deploy/.env.example deploy/.env      # fill in PUBLIC_URL, OIDC_ISSUER, passwords, token
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
 ```
+
+### Kubernetes, and a separate runner
+
+On Kubernetes, agents run in their own **runner** service (`apps/runner`, image
+`the-factory-runner`), and the server reaches it with `RUNNER_URL` + `RUNNER_TOKEN`.
+See [deploy/k8s/README.md](../deploy/k8s/README.md). Locally, run `pnpm dev:runner`
+(with `RUNNER_TOKEN` set) and point the server at it the same way. Without `RUNNER_URL`
+the server runs agents itself, as in the compose setup.
 
 ### Agent logins on the server
 

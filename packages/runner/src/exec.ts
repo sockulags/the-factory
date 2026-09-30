@@ -14,8 +14,10 @@ const MAX_OUTPUT = 20_000;
 export function runCommand(
   command: string,
   cwd: string,
-  timeoutMs = 15 * 60_000,
+  timeout?: number | null,
 ): Promise<ExecResult> {
+  // Callers across the runner protocol send null for "not given".
+  const timeoutMs = timeout && timeout > 0 ? timeout : 15 * 60_000;
   const started = Date.now();
   return new Promise((resolve) => {
     const child = spawn(command, {

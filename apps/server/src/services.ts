@@ -9,7 +9,13 @@ import {
   WorkflowEngine,
 } from "@factory/core";
 import type { Db } from "@factory/db";
-import { type AgentSpec, LocalRunner, loadAgents, type Runner } from "@factory/runner";
+import {
+  type AgentSpec,
+  LocalRunner,
+  loadAgents,
+  RemoteRunner,
+  type Runner,
+} from "@factory/runner";
 import type { ServerConfig } from "./config.js";
 
 /** Tells SSE clients that a card changed so they refetch it. */
@@ -46,8 +52,20 @@ export async function createFactoryServices(opts: {
   plugins?: PluginHost;
 }): Promise<FactoryServices> {
   const { db, config } = opts;
-  const agents = opts.agents ?? (await loadAgents(config.AGENTS_CONFIG));
-  const runner = opts.runner ?? new LocalRunner(agents);
+  let agents: AgentSpec[];
+  let runner: Runner;
+  if (opts.runner) {
+    runner = opts.runner;
+    agents = opts.agents ?? [];
+  } else if (config.RUNNER_URL) {
+    // Agents run on the runner service; it tells us which ones it has.
+    const remote = new RemoteRunner(config.RUNNER_URL, config.RUNNER_TOKEN ?? "");
+    agents = (await remote.agents()).map((a) => ({ ...a, command: "", args: [] }));
+    runner = remote;
+  } else {
+    agents = opts.agents ?? (await loadAgents(config.AGENTS_CONFIG));
+    runner = new LocalRunner(agents);
+  }
   const workflows = await loadWorkflows(
     path.resolve(config.WORKFLOWS_DIR),
     agents.map((a) => a.id),
