@@ -5,6 +5,7 @@
 ```
 apps/server      Hono API server: auth (Keycloak/OIDC), client config, update feed
 apps/desktop     Electron app: main process (auth, updates, IPC) + preload bridge
+packages/runner  ACP client host: spawns agents, permission policy, probe + chat CLI
 packages/ui      React UI rendered inside the desktop app
 packages/protocol Shared types/schemas: API, desktop bridge, version rules
 packages/db      Drizzle schema + migrations (Postgres; PGlite for dev/tests)
@@ -53,6 +54,16 @@ For UI hot reload, run `pnpm dev:ui` and start the app with
 
 Useful env vars for the app: `FACTORY_SERVER_URL` (pre-fills the server address),
 `FACTORY_USER_DATA_DIR` (separate profile, e.g. to run two users side by side).
+
+## Agents (ACP)
+
+```sh
+pnpm probe --agents claude,codex --out docs/acp-capabilities.md   # capability matrix
+pnpm chat claude --cwd ../some-repo [--read-only]                  # talk to an agent
+```
+
+Agents use the CLI logins on the machine (`claude /login`, `codex login`). See
+[acp-probe.md](acp-probe.md).
 
 ## Tests
 

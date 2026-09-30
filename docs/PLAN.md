@@ -1,6 +1,6 @@
 # The Factory — Plan
 
-Status: draft, living document. Last updated 2026-09-30 (rev 4).
+Status: draft, living document. Last updated 2026-09-30 (rev 5).
 
 ## 1. What we're building
 
@@ -257,8 +257,9 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
 - Desktop: Electron + electron-vite + electron-builder/electron-updater.
 - DB: Drizzle ORM (pg dialect); Postgres on the server, PGlite in dev/tests.
 - UI: React + Vite + TanStack Query; dnd-kit for the board.
-- ACP: the official TypeScript SDK; adapters for Claude Code, Codex and
-  Gemini CLI. Exact package names/versions get pinned in phase 1.
+- ACP: `@agentclientprotocol/sdk` (protocol v1). Adapters:
+  `@agentclientprotocol/claude-agent-acp`, `@agentclientprotocol/codex-acp`,
+  `gemini --acp`. They authenticate with the CLI logins already on the machine.
 
 ## 6. Phases
 
@@ -267,9 +268,11 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
    that builds and publishes releases, auto-update fed by the server. From
    here on, every merged feature reaches the team automatically. Remaining:
    first real release on the VPN server, Windows signing certificate.
-1. **ACP spike (CLI).** Spawn two different agents in the same worktree.
-   Prove: prompt/stream, permission handling, `session/load` / resume,
-   cancellation, usage reporting. Output: a capability matrix per adapter.
+1. **ACP spike (CLI).** 🟡 *Harness built* (`packages/runner`, `pnpm probe`):
+   ACP client host, read-only/write permission policy, and a probe covering
+   prompt/stream, usage, writes, read-only enforcement, cancel, and resume
+   across process restarts. Remaining: run it with real logins and record
+   [acp-capabilities.md](acp-capabilities.md). See [acp-probe.md](acp-probe.md).
 2. **Threads + model switch (CLI/API).** Event log, per-agent cursors, delta
    preamble, checkpoints, driver/consultant modes, rehydration. Built behind
    the runner interface from the start (in-process implementation).

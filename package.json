@@ -13,7 +13,9 @@
     "format": "biome check --write .",
     "dev:server": "pnpm --filter @factory/server dev",
     "dev:ui": "pnpm --filter @factory/ui dev",
-    "dev:desktop": "pnpm --filter @factory/desktop dev"
+    "dev:desktop": "pnpm --filter @factory/desktop dev",
+    "probe": "pnpm --filter @factory/runner probe",
+    "chat": "pnpm --filter @factory/runner chat"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
