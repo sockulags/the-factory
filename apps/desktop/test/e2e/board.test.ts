@@ -92,14 +92,20 @@ describe("board (e2e)", () => {
       await page.getByRole("button", { name: "Create in backlog" }).click();
       const docsPanel = page.getByRole("complementary", { name: "Card WEB-2" });
       await docsPanel.getByRole("button", { name: "Start" }).click();
-      await docsPanel.getByRole("button", { name: "Approve & commit docs" }).waitFor({ timeout: 30_000 });
+      await docsPanel
+        .getByRole("button", { name: "Approve & commit docs" })
+        .waitFor({ timeout: 30_000 });
       await docsPanel.getByRole("tab", { name: /Doc changes/ }).click();
       await expect
-        .poll(async () => (await docsPanel.locator(".diff .add").allTextContents()).map((t) => t.trim()))
+        .poll(async () =>
+          (await docsPanel.locator(".diff .add").allTextContents()).map((t) => t.trim()),
+        )
         .toContain("+# Guide for CSV export");
       await shots("docs-review");
       await docsPanel.getByRole("button", { name: "Approve & commit docs" }).click();
-      await expect.poll(() => docsPanel.getByText("Approved and committed").count(), { timeout: 20_000 }).toBe(1);
+      await expect
+        .poll(() => docsPanel.getByText("Approved and committed").count(), { timeout: 20_000 })
+        .toBe(1);
     } finally {
       await app.close();
     }
