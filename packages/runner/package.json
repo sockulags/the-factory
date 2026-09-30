@@ -1,0 +1,21 @@
+{
+  "name": "@factory/runner",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "probe": "tsx src/cli.ts probe",
+    "chat": "tsx src/cli.ts chat",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^1.5.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
+  }
+}
