@@ -228,6 +228,56 @@ describe("factory API", () => {
     });
   });
 
+  it("lets only admins manage products, repos and integrations", async () => {
+    const member = createApp({
+      config: loadConfig({ AUTH_MODE: "dev", DEV_TOKEN: "dev" }),
+      db: handle.db,
+      authenticate: async () => ({
+        subject: "m1",
+        username: "member",
+        name: "Member",
+        email: null,
+        roles: ["factory-user"],
+      }),
+      serverVersion: "0.1.0",
+      factory,
+    });
+    const req = (method: string, url: string, body?: unknown) =>
+      member.request(url, {
+        method,
+        headers: { authorization: "Bearer x", "content-type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    const [product] = (await call<ProductDto[]>("GET", "/api/products")).json;
+    expect((await req("POST", "/api/products", { key: "NOPE", name: "x" })).status).toBe(403);
+    expect(
+      (await req("POST", `/api/products/${product?.id}/repos`, { name: "r", path: "/tmp" })).status,
+    ).toBe(403);
+    expect(
+      (
+        await req("PUT", `/api/products/${product?.id}/plugins/github`, {
+          enabled: false,
+          config: {},
+        })
+      ).status,
+    ).toBe(403);
+    // …but can read the board and see they aren't an admin.
+    expect((await req("GET", "/api/products")).status).toBe(200);
+    expect(await (await req("GET", "/api/me")).json()).toMatchObject({ isAdmin: false });
+    expect(await (await call("GET", "/api/me")).json).toMatchObject({ isAdmin: true });
+  });
+
+  it("reports usage", async () => {
+    const usage = (
+      await call<{ total: { turns: number }; byAgent: { agentId: string }[] }>(
+        "GET",
+        "/api/usage?days=7",
+      )
+    ).json;
+    expect(usage.total.turns).toBeGreaterThan(0);
+    expect(usage.byAgent.map((a) => a.agentId)).toContain("alpha");
+  });
+
   it("streams thread events over SSE", async () => {
     const [product] = (await call<ProductDto[]>("GET", "/api/products")).json;
     const created = await call<CardDto>("POST", `/api/products/${product?.id}/cards`, {

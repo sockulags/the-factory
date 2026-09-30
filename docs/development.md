@@ -178,6 +178,10 @@ Create (or import from `deploy/keycloak/factory-realm.json`) a client:
 | PKCE method | S256 |
 | Valid redirect URIs | `http://127.0.0.1:*` (loopback, any port, per RFC 8252) |
 
+Give people who should manage products, repos and integrations the `factory-admin` realm
+role (or set `ADMIN_ROLE` to a role you already use). Everyone else can create and work
+cards.
+
 The app sends access tokens to the server. The server accepts them when `azp` (or
 `aud`) is `factory-desktop` and the issuer matches `OIDC_ISSUER`. Realm roles and the
 client's roles show up as the user's roles.

@@ -23,7 +23,7 @@ export interface AppDeps {
   factory?: FactoryServices;
 }
 
-type Env = { Variables: { identity: Identity; userId: string } };
+type Env = { Variables: { identity: Identity; userId: string; roles: string[] } };
 
 export function createApp({ config, db, authenticate, serverVersion, factory }: AppDeps) {
   const app = new Hono<Env>();
@@ -89,6 +89,7 @@ export function createApp({ config, db, authenticate, serverVersion, factory }: 
       name: user.name,
       email: user.email,
       roles: identity.roles,
+      isAdmin: identity.roles.includes(config.ADMIN_ROLE),
     };
     return c.json(me);
   });
@@ -104,11 +105,12 @@ export function createApp({ config, db, authenticate, serverVersion, factory }: 
         userIds.set(identity.subject, id);
       }
       c.set("userId", id);
+      c.set("roles", identity.roles);
       await next();
     });
     const api = new Hono<Env>();
     api.use("*", requireAuth, withUser);
-    api.route("/", factoryRoutes(factory));
+    api.route("/", factoryRoutes(factory, { adminRole: config.ADMIN_ROLE }));
     app.route("/api", api);
   }
 

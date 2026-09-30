@@ -33,6 +33,7 @@ export interface FactoryServices {
   agents: AgentSpec[];
   bus: ChangeBus;
   plugins: PluginHost;
+  db: Db;
 }
 
 export async function createFactoryServices(opts: {
@@ -74,5 +75,5 @@ export async function createFactoryServices(opts: {
     instructionsFor: (card) => plugins.instructionsFor(card.productId),
     onCardChange: (id) => bus.cardChanged(id),
   });
-  return { board, threads, engine, runner, workflows, agents, bus, plugins };
+  return { board, threads, engine, runner, workflows, agents, bus, plugins, db };
 }

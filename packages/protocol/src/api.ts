@@ -192,3 +192,19 @@ export type ThreadStreamEvent =
 export type BoardStreamEvent =
   | { type: "card"; cardId: string; productId: string }
   | { type: "hello" };
+
+export interface UsageRowDto {
+  turns: number;
+  inputTokens: number;
+  outputTokens: number;
+  cost: number;
+  durationMs: number;
+}
+
+export interface UsageReportDto {
+  since: string;
+  total: UsageRowDto;
+  byAgent: (UsageRowDto & { agentId: string })[];
+  byCard: (UsageRowDto & { cardId: string; key: string; title: string })[];
+  byDay: (UsageRowDto & { day: string })[];
+}

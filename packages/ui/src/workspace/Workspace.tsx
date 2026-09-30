@@ -13,6 +13,7 @@ import { Board } from "./Board.js";
 import { CardPanel } from "./CardPanel.js";
 import { NewCardDialog } from "./NewCardDialog.js";
 import { ProductSetup } from "./ProductSetup.js";
+import { UsageView } from "./UsageView.js";
 
 export interface WorkspaceContext {
   bridge: DesktopBridge;
@@ -34,6 +35,7 @@ export function Workspace({ bridge, state }: { bridge: DesktopBridge; state: Des
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [setup, setSetup] = useState(false);
+  const [view, setView] = useState<"board" | "usage">("board");
   const [changeTick, setChangeTick] = useState(0);
   const [lastChanged, setLastChanged] = useState<string | null>(null);
 
@@ -72,6 +74,7 @@ export function Workspace({ bridge, state }: { bridge: DesktopBridge; state: Des
     workflows: workflows.data,
   };
 
+  const isAdmin = state.me?.isAdmin ?? false;
   const showSetup = !product || setup;
 
   return (
@@ -87,9 +90,29 @@ export function Workspace({ bridge, state }: { bridge: DesktopBridge; state: Des
             ))}
           </select>
         )}
-        <button type="button" className="ghost" onClick={() => setSetup(true)}>
-          Products & repos
-        </button>
+        {product && (
+          <nav className="views" aria-label="Views">
+            {(["board", "usage"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                className={view === v && !setup ? "ghost active" : "ghost"}
+                aria-current={view === v && !setup ? "page" : undefined}
+                onClick={() => {
+                  setView(v);
+                  setSetup(false);
+                }}
+              >
+                {v === "board" ? "Board" : "Usage"}
+              </button>
+            ))}
+          </nav>
+        )}
+        {isAdmin && (
+          <button type="button" className="ghost" onClick={() => setSetup(true)}>
+            Products & repos
+          </button>
+        )}
         <span className="spacer" />
         {product && !setup && (
           <button type="button" onClick={() => setCreating(true)}>
@@ -115,7 +138,11 @@ export function Workspace({ bridge, state }: { bridge: DesktopBridge; state: Des
           Sign out
         </button>
       </header>
-      {showSetup || !product ? (
+      {!product && !isAdmin ? (
+        <div className="center-fill muted pad">
+          No products yet. Ask someone with the admin role to create one under Products &amp; repos.
+        </div>
+      ) : showSetup || !product ? (
         <ProductSetup
           ctx={ctx}
           products={products.data}
@@ -126,6 +153,8 @@ export function Workspace({ bridge, state }: { bridge: DesktopBridge; state: Des
           }}
           onCancel={product ? () => setSetup(false) : undefined}
         />
+      ) : view === "usage" ? (
+        <UsageView ctx={ctx} productId={product.id} productKey={product.key} />
       ) : (
         <div className={selectedCard ? "main with-panel" : "main"}>
           <Board

@@ -1,5 +1,5 @@
 import type { Card, CardEvent, HandoverRow, Thread, ThreadEvent } from "@factory/core";
-import { PluginError, WorkflowError } from "@factory/core";
+import { PluginError, usageReport, WorkflowError } from "@factory/core";
 import type {
   CardDetailDto,
   CardDto,
@@ -16,16 +16,27 @@ import type {
   WorkflowDto,
 } from "@factory/protocol";
 import { Hono } from "hono";
+import { createMiddleware } from "hono/factory";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import type { FactoryServices } from "./services.js";
 
-export type ApiEnv = { Variables: { userId: string } };
+export type ApiEnv = { Variables: { userId: string; roles: string[] } };
 
 const iso = (d: Date) => d.toISOString();
 
-export function factoryRoutes(f: FactoryServices) {
+export function factoryRoutes(f: FactoryServices, opts: { adminRole: string }) {
   const api = new Hono<ApiEnv>();
+  /** Products, repos and integrations are managed by admins; everyone works cards. */
+  const adminOnly = createMiddleware<ApiEnv>(async (c, next) => {
+    if (!c.get("roles").includes(opts.adminRole)) {
+      return c.json(
+        { error: "forbidden", detail: `Only people with the "${opts.adminRole}" role can do this` },
+        403,
+      );
+    }
+    await next();
+  });
   const actor = (userId: string) => `user:${userId}`;
 
   const cardDto = (c: Card): CardDto => ({
@@ -129,7 +140,7 @@ export function factoryRoutes(f: FactoryServices) {
   // ── Products & repos ───────────────────────────────────────────
   api.get("/products", async (c) => c.json((await f.board.listProducts()).map(productDto)));
 
-  api.post("/products", async (c) => {
+  api.post("/products", adminOnly, async (c) => {
     const body = z.object({ key: z.string(), name: z.string().min(1) }).parse(await c.req.json());
     try {
       return c.json(productDto(await f.board.createProduct(body)), 201);
@@ -146,7 +157,7 @@ export function factoryRoutes(f: FactoryServices) {
     c.json((await f.board.listRepos(c.req.param("id"))).map(repoDto)),
   );
 
-  api.post("/products/:id/repos", async (c) => {
+  api.post("/products/:id/repos", adminOnly, async (c) => {
     const body = z
       .object({
         name: z.string().min(1),
@@ -171,12 +182,18 @@ export function factoryRoutes(f: FactoryServices) {
     ),
   );
   api.get("/products/:id/plugins", async (c) => c.json(await f.plugins.configs(c.req.param("id"))));
-  api.put("/products/:id/plugins/:plugin", async (c) => {
+  api.put("/products/:id/plugins/:plugin", adminOnly, async (c) => {
     const body = z
       .object({ enabled: z.boolean(), config: z.record(z.string(), z.unknown()).default({}) })
       .parse(await c.req.json());
     if (!(await f.board.getProduct(c.req.param("id")))) throw new NotFound("product");
     return c.json(await f.plugins.configure(c.req.param("id"), c.req.param("plugin"), body));
+  });
+
+  // ── Usage ──────────────────────────────────────────────────────
+  api.get("/usage", async (c) => {
+    const days = Math.min(Math.max(Number(c.req.query("days") ?? 30) || 30, 1), 365);
+    return c.json(await usageReport(f.db, { productId: c.req.query("productId") || null, days }));
   });
 
   // ── Cards ──────────────────────────────────────────────────────

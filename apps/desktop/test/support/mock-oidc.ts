@@ -38,7 +38,7 @@ export async function startMockOidc(opts: { clientId: string; user: MockUser }):
       ...opts.user,
       azp: opts.clientId,
       aud: "account",
-      realm_access: { roles: ["factory-user"] },
+      realm_access: { roles: ["factory-user", "factory-admin"] },
     })
       .setProtectedHeader({ alg: "RS256", kid: "mock-1" })
       .setIssuer(issuer)
