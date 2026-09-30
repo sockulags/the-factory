@@ -4,6 +4,7 @@ import type {
   CardDetailDto,
   CardDto,
   CardEventDto,
+  DocProposalDto,
   GateDecision,
   HandoverDto,
   ProductDto,
@@ -195,6 +196,16 @@ export function factoryRoutes(f: FactoryServices) {
       events: (await f.board.events(card.id)).map(eventDto),
       handovers: (await f.board.handovers(card.id)).map(handoverDto),
       threads: (await f.board.cardThreads(card.id)).map(threadSummary),
+      docProposals: (await f.board.docProposals(card.id)).map((p) => ({
+        id: p.id,
+        step: p.step,
+        status: p.status as DocProposalDto["status"],
+        patch: p.patch,
+        files: p.files,
+        outsideDocs: p.outsideDocs,
+        reviewedBy: p.reviewedBy,
+        createdAt: iso(p.createdAt),
+      })),
     };
     return c.json(detail);
   });
@@ -224,12 +235,15 @@ export function factoryRoutes(f: FactoryServices) {
       .object({
         decision: z.enum(["approved", "changes_requested"]),
         comment: z.string().max(20_000).optional(),
+        /** With "approved" on a docs step: revert the proposed doc changes instead of committing them. */
+        discardDocs: z.boolean().optional(),
       })
       .parse(await c.req.json());
     const card = await requireCard(c.req.param("id"));
     await f.engine.decide(card.id, body.decision as GateDecision, {
       comment: body.comment,
       actor: actor(c.get("userId")),
+      discardDocs: body.discardDocs,
     });
     return c.json({ ok: true }, 202);
   });

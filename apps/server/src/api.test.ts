@@ -113,7 +113,11 @@ describe("factory API", () => {
       "beta",
     ]);
     const wfs = (await call<WorkflowDto[]>("GET", "/api/workflows")).json;
-    expect(wfs[0]?.steps.map((s) => s.id)).toEqual(["triage", "fix", "review"]);
+    expect(wfs.find((w) => w.type === "lite")?.steps.map((s) => s.id)).toEqual([
+      "triage",
+      "fix",
+      "review",
+    ]);
   });
 
   it("runs a card from creation to done over the API, with a thread message in between", async () => {

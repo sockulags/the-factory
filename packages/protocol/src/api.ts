@@ -98,11 +98,25 @@ export interface ThreadSummaryDto {
   createdAt: string;
 }
 
+export interface DocProposalDto {
+  id: string;
+  step: string;
+  status: "pending" | "approved" | "discarded" | "superseded";
+  /** Unified diff of the docs directory. */
+  patch: string;
+  files: FileChangeDto[];
+  /** Files changed outside the docs directory during the docs step. */
+  outsideDocs: string[];
+  reviewedBy: string | null;
+  createdAt: string;
+}
+
 export interface CardDetailDto {
   card: CardDto;
   events: CardEventDto[];
   handovers: HandoverDto[];
   threads: ThreadSummaryDto[];
+  docProposals: DocProposalDto[];
 }
 
 export interface FileChangeDto {

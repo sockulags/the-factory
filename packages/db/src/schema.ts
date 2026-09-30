@@ -153,3 +153,28 @@ export const handovers = pgTable("handovers", {
   content: jsonb("content").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Documentation changes an agent proposed in a docs step. A person approves (committed
+ * to the card branch with the step), asks for changes, or discards them (reverted).
+ */
+export const docProposals = pgTable("doc_proposals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  cardId: uuid("card_id")
+    .notNull()
+    .references(() => cards.id, { onDelete: "cascade" }),
+  step: text("step").notNull(),
+  threadId: uuid("thread_id").references(() => threads.id, { onDelete: "set null" }),
+  /** Worktree snapshots the patch was computed between. */
+  baseCheckpoint: text("base_checkpoint").notNull(),
+  headCheckpoint: text("head_checkpoint").notNull(),
+  patch: text("patch").notNull(),
+  files: jsonb("files").$type<{ path: string; added: number; removed: number }[]>().notNull(),
+  /** Files changed outside the docs directory during the step (flagged for the reviewer). */
+  outsideDocs: jsonb("outside_docs").$type<string[]>().notNull().default([]),
+  /** pending | approved | discarded | superseded */
+  status: text("status").notNull().default("pending"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

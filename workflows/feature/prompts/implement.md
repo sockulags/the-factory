@@ -4,6 +4,12 @@ Implement this feature according to the plan.
 
 {{handover.previous}}
 
+{{#if docs.relevant}}
+Relevant product documentation (may be out of date — the code is the truth):
+
+{{docs.relevant}}
+{{/if}}
+
 Guidelines:
 - Follow the plan; if you must deviate, say where and why.
 - Match the existing code style and patterns. Add tests for the new behavior.

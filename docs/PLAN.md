@@ -1,6 +1,6 @@
 # The Factory — Plan
 
-Status: draft, living document. Last updated 2026-09-30 (rev 8).
+Status: draft, living document. Last updated 2026-09-30 (rev 9).
 
 ## 1. What we're building
 
@@ -293,7 +293,11 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
    (status columns, or a type's steps as columns with drag-to-move), card panel
    with step progress, gate actions, live threads with agent + Consult/Drive
    switch, "what it saw" context view, handovers and history.
-5. **Docs steward.** Doc-change proposals + review queue, context selection.
+5. **Docs steward.** ✅ *Built.* Docs steps turn their `docs/` diff into a
+   proposal (outside changes flagged); reviewers approve (committed), request
+   changes (continues the thread, same base) or discard (reverted). Approved
+   write steps commit to the card branch. Prompts get `{{docs.index}}` and the
+   most relevant pages (`{{docs.relevant}}`).
 6. **Plugins.** Plugin interface; first plugin = GitHub or GitLab (open PR on
    done), then Jira/Confluence.
 7. **Team & ops.** Roles, multi-product views, usage dashboards, k8s
