@@ -1,0 +1,46 @@
+# DRAFT — illustrative, schema not final.
+# One thread per step. One worktree per card, shared by all steps.
+# Steps without `on:` advance to the next step when their gate passes.
+type: bug
+columns: [backlog, triage, reproduce, fix, review, docs, done]
+
+steps:
+  triage:
+    agent: claude
+    mode: read-only
+    prompt: ./prompts/triage.md
+    gate: human            # human confirms severity/scope before work starts
+    outputs: [handover]
+
+  reproduce:
+    agent: codex
+    mode: write            # may add a failing test
+    prompt: ./prompts/reproduce.md
+    gate: checks           # the new test must fail for the right reason
+    outputs: [handover]
+
+  fix:
+    agent: claude
+    mode: write
+    prompt: ./prompts/fix.md
+    gate: checks           # tests + lint green
+    outputs: [handover]
+
+  review:
+    agent: codex           # a different provider than the one that wrote the fix
+    mode: read-only
+    prompt: ./prompts/review.md
+    gate: human
+    outputs: [handover]
+    on:
+      approved: docs
+      changes_requested: fix         # re-enters and CONTINUES the fix thread
+
+  docs:
+    agent: claude
+    mode: read-only
+    prompt: ../_shared/docs-steward.md
+    gate: human            # human approves the doc diff
+    outputs: [doc_proposal]        # approved diff is committed to the card branch
+    hooks:
+      exit: [vcs.open_pr]            # provided by the github/gitlab plugin

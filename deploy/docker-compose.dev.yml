@@ -1,0 +1,14 @@
+# Local Keycloak with a ready-made "factory" realm for developing against real OIDC.
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+#   Admin console: http://localhost:8080 (admin / admin)   Test user: dev / dev
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    ports:
+      - "8080:8080"

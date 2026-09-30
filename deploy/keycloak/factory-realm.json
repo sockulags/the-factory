@@ -1,0 +1,41 @@
+{
+  "realm": "factory",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      { "name": "factory-user", "description": "May use The Factory" },
+      { "name": "factory-admin", "description": "Administers The Factory" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "factory-desktop",
+      "name": "The Factory desktop app",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "redirectUris": ["http://127.0.0.1:*"],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"],
+      "optionalClientScopes": ["offline_access"]
+    }
+  ],
+  "users": [
+    {
+      "username": "dev",
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "User",
+      "email": "dev@example.com",
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "dev", "temporary": false }],
+      "realmRoles": ["factory-user", "factory-admin", "default-roles-factory"]
+    }
+  ]
+}
