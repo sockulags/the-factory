@@ -16,7 +16,8 @@
     "dev:desktop": "pnpm --filter @factory/desktop dev",
     "probe": "pnpm --filter @factory/runner probe",
     "chat": "pnpm --filter @factory/runner chat",
-    "thread": "pnpm --filter @factory/core thread"
+    "thread": "pnpm --filter @factory/core thread",
+    "factory": "pnpm --filter @factory/core factory"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.4",

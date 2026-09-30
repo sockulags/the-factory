@@ -6,12 +6,12 @@
 apps/server      Hono API server: auth (Keycloak/OIDC), client config, update feed
 apps/desktop     Electron app: main process (auth, updates, IPC) + preload bridge
 packages/runner  ACP client host: spawns agents, permission policy, checkpoints, probe/chat CLI
-packages/core    Thread service: event log, per-agent cursors, context deltas, model switching
+packages/core    Threads (event log, cursors, deltas), board store, workflow engine, CLIs
+workflows/       Workflow definitions and step prompts (see docs/workflows.md)
 packages/ui      React UI rendered inside the desktop app
 packages/protocol Shared types/schemas: API, desktop bridge, version rules
 packages/db      Drizzle schema + migrations (Postgres; PGlite for dev/tests)
 deploy/          Server image, compose files, dev Keycloak realm
-workflows/       Draft workflow definitions (not wired up yet)
 ```
 
 Internal packages are consumed as TypeScript source; the server and the desktop
@@ -79,6 +79,21 @@ a running turn. Each agent keeps its own provider session per thread. Before a t
 receives only what it hasn't seen (others' messages and replies, plus a diffstat of
 worktree changes with a `git diff <checkpoint>` hint). If its session can't be
 reattached, it gets a recap instead. Data lives in `~/.factory/cli-db`.
+
+### Cards and workflows
+
+```sh
+pnpm factory product add WEB "Web app"
+pnpm factory repo add WEB ../web --branch main --checks "pnpm test"
+pnpm factory card new WEB bug "Login button does nothing" --body "…"
+pnpm factory card start WEB-1        # runs triage, streams it, stops at the gate
+pnpm factory card approve WEB-1      # or: card changes WEB-1 --comment "…"
+pnpm factory card show WEB-1         # state, handovers, history
+pnpm factory cards WEB
+```
+
+Worktrees go to `~/.factory/worktrees/<card>`. `card close` removes the worktree (the
+branch stays).
 
 ## Tests
 

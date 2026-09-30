@@ -73,3 +73,36 @@ export async function deleteRefs(cwd: string, prefix: string): Promise<void> {
   const refs = await git(cwd, ["for-each-ref", "--format=%(refname)", prefix]);
   for (const ref of refs.split("\n").filter(Boolean)) await git(cwd, ["update-ref", "-d", ref]);
 }
+
+/**
+ * Creates (or reuses) a worktree at `worktreePath` on `branch`, branching from `base`.
+ * Idempotent: if the worktree already exists it is left as is.
+ */
+export async function ensureWorktree(
+  repoPath: string,
+  worktreePath: string,
+  branch: string,
+  base: string,
+): Promise<void> {
+  const existing = await git(repoPath, ["worktree", "list", "--porcelain"]);
+  if (existing.split("\n").some((l) => l === `worktree ${path.resolve(worktreePath)}`)) return;
+  const branchExists = await git(repoPath, [
+    "rev-parse",
+    "--verify",
+    "-q",
+    `refs/heads/${branch}`,
+  ]).then(
+    () => true,
+    () => false,
+  );
+  const args = branchExists
+    ? ["worktree", "add", worktreePath, branch]
+    : ["worktree", "add", "-b", branch, worktreePath, base];
+  await git(repoPath, args);
+}
+
+/** Removes a card's worktree (including uncommitted changes) and prunes its metadata. */
+export async function removeWorktree(repoPath: string, worktreePath: string): Promise<void> {
+  await git(repoPath, ["worktree", "remove", "--force", worktreePath]).catch(() => undefined);
+  await git(repoPath, ["worktree", "prune"]);
+}

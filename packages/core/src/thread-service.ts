@@ -63,10 +63,18 @@ export class ThreadService {
     title: string;
     cwd: string;
     createdBy?: string | null;
+    cardId?: string | null;
+    step?: string | null;
   }): Promise<Thread> {
     const [row] = await this.options.db
       .insert(threads)
-      .values({ title: input.title, cwd: input.cwd, createdBy: input.createdBy ?? null })
+      .values({
+        title: input.title,
+        cwd: input.cwd,
+        createdBy: input.createdBy ?? null,
+        cardId: input.cardId ?? null,
+        step: input.step ?? null,
+      })
       .returning();
     if (!row) throw new Error("failed to create thread");
     return row;

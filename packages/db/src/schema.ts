@@ -29,6 +29,9 @@ export const threads = pgTable("threads", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
   cwd: text("cwd").notNull(),
+  /** Card and workflow step this thread belongs to; null for ad-hoc threads. */
+  cardId: uuid("card_id").references(() => cards.id, { onDelete: "cascade" }),
+  step: text("step"),
   createdBy: uuid("created_by").references(() => users.id),
   /** Agent currently allowed to write in the worktree (the "driver"). */
   driverAgentId: text("driver_agent_id"),
@@ -73,3 +76,80 @@ export const agentSessions = pgTable(
   },
   (t) => [primaryKey({ columns: [t.threadId, t.agentId] })],
 );
+
+/** A product the team works on. Owns repos and cards. */
+export const products = pgTable("products", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** Short uppercase prefix for card keys, e.g. "WEB" → WEB-42. */
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** A git repository of a product, as checked out on the runner. */
+export const repos = pgTable("repos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  /** Path of the main checkout on the runner; card worktrees are created from it. */
+  path: text("path").notNull(),
+  defaultBranch: text("default_branch").notNull().default("main"),
+  /** Commands the `checks` gate runs in the worktree, e.g. ["pnpm test"]. */
+  checks: jsonb("checks").$type<string[]>().notNull().default([]),
+});
+
+/**
+ * A unit of work on the board. `type` selects the workflow; `step` is the workflow step
+ * it is in (null while in the backlog); `state` says what the step is doing.
+ */
+export const cards = pgTable(
+  "cards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    repoId: uuid("repo_id").references(() => repos.id),
+    number: integer("number").notNull(),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    step: text("step"),
+    /** backlog | running | awaiting_gate | blocked | done | closed */
+    state: text("state").notNull().default("backlog"),
+    rank: text("rank").notNull().default("m"),
+    assigneeId: uuid("assignee_id").references(() => users.id),
+    branch: text("branch"),
+    worktreePath: text("worktree_path"),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("cards_product_number").on(t.productId, t.number)],
+);
+
+/** Card history: step transitions, gate decisions, hooks, errors. Feeds the activity view. */
+export const cardEvents = pgTable("card_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  cardId: uuid("card_id")
+    .notNull()
+    .references(() => cards.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  actor: text("actor").notNull(),
+  payload: jsonb("payload").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Structured summary written at the end of each step; the next step starts from it. */
+export const handovers = pgTable("handovers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  cardId: uuid("card_id")
+    .notNull()
+    .references(() => cards.id, { onDelete: "cascade" }),
+  step: text("step").notNull(),
+  threadId: uuid("thread_id").references(() => threads.id, { onDelete: "set null" }),
+  content: jsonb("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

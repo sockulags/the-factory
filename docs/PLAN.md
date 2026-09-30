@@ -1,6 +1,6 @@
 # The Factory — Plan
 
-Status: draft, living document. Last updated 2026-09-30 (rev 6).
+Status: draft, living document. Last updated 2026-09-30 (rev 7).
 
 ## 1. What we're building
 
@@ -279,9 +279,13 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
    recap when a session can't be reattached, git checkpoints as hidden refs
    (HEAD/index untouched), write vs consult (read-only) turns, serialized turns,
    live event stream. Try it with `pnpm thread` (`@claude …` / `?codex …`).
-3. **Workflow engine.** YAML types, step threads, transitions (incl.
-   re-entry), gates, handovers, lifecycle (worktree create/delete). Run one
-   bug card end to end, including a review → implement loop.
+3. **Workflow engine.** ✅ *Built* (`packages/core` WorkflowEngine + Board).
+   YAML workflows with prompt templates (`workflows/`, see
+   [workflows.md](workflows.md)), one thread per step, re-entry continues
+   the step's thread, consult/revise rounds, validated JSON handovers,
+   auto/human/checks gates (failing checks loop back), hooks, per-card
+   worktrees (created on demand, removed on close). Try it with
+   `pnpm factory`.
 4. **Board UI** (in the desktop app). Backlog, kanban, card view with live
    threads, gate approval.
 5. **Docs steward.** Doc-change proposals + review queue, context selection.
