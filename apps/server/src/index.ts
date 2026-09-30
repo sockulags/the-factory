@@ -6,6 +6,7 @@ import pkg from "../package.json" with { type: "json" };
 import { createApp } from "./app.js";
 import { createDevAuthenticator, createOidcAuthenticator } from "./auth.js";
 import { loadConfig } from "./config.js";
+import { createFactoryServices } from "./services.js";
 import { mirrorLatestRelease } from "./updates.js";
 
 const config = loadConfig();
@@ -28,7 +29,17 @@ const authenticate =
 if (config.AUTH_MODE === "dev")
   console.warn("⚠ AUTH_MODE=dev — do not use outside local development");
 
-const app = createApp({ config, db: dbHandle.db, authenticate, serverVersion: pkg.version });
+const factory = await createFactoryServices({ db: dbHandle.db, config });
+console.log(
+  `workflows: ${[...factory.workflows.keys()].join(", ") || "none"} · agents: ${factory.agents.map((a) => a.id).join(", ")}`,
+);
+const app = createApp({
+  config,
+  db: dbHandle.db,
+  authenticate,
+  serverVersion: pkg.version,
+  factory,
+});
 
 if (config.UPDATE_MIRROR_REPO) {
   const repo = config.UPDATE_MIRROR_REPO;
@@ -58,6 +69,7 @@ const server = serve({ fetch: app.fetch, hostname: config.HOST, port: config.POR
 
 const shutdown = () => {
   server.close();
+  void factory.runner.shutdown();
   void dbHandle.close().finally(() => process.exit(0));
 };
 process.on("SIGINT", shutdown);

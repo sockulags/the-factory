@@ -32,11 +32,20 @@ services:
       MIN_CLIENT_VERSION: ${MIN_CLIENT_VERSION:-0.0.0}
       UPDATE_MIRROR_REPO: ${UPDATE_MIRROR_REPO:-sockulags/the-factory}
       UPDATE_MIRROR_TOKEN: ${UPDATE_MIRROR_TOKEN:-}
+      AGENTS_CONFIG: ${AGENTS_CONFIG:-}
     volumes:
       - updates:/updates
+      # Card worktrees and runner data.
+      - data:/data
+      # Repos the team registers in the app (Products & repos → path, e.g. /repos/web).
+      - ${REPOS_DIR:-./repos}:/repos
+      # Agent CLI logins for the shared subscriptions (~/.claude, ~/.codex, …).
+      - agent-home:/home/node
     ports:
       - "${BIND_ADDRESS:-0.0.0.0}:8787:8787"
 
 volumes:
   pgdata:
   updates:
+  data:
+  agent-home:

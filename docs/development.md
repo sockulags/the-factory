@@ -50,6 +50,13 @@ pnpm dev:server                                          # .env defaults point a
 pnpm dev:desktop    # builds UI + main, launches Electron; enter http://localhost:8787
 ```
 
+After signing in you get the board. **Products & repos** registers a product and the
+path of its repo (as seen by the server). **New card** creates a card in the backlog;
+**Start** (or dragging it onto the first step) runs its workflow. The card panel shows
+the step's live thread. You can switch agent and mode (Consult = read-only,
+Drive = may edit) for any message, approve or request changes at gates, and read
+handovers and history.
+
 For UI hot reload, run `pnpm dev:ui` and start the app with
 `FACTORY_UI_DEV_URL=http://localhost:5173`.
 
@@ -139,6 +146,22 @@ first install. For Azure Trusted Signing, add `win.azureSignOptions` to
 cp deploy/.env.example deploy/.env      # fill in PUBLIC_URL, OIDC_ISSUER, passwords, token
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
 ```
+
+### Agent logins on the server
+
+Agents run inside the server container and use the team's shared subscriptions. Sign
+each CLI in once. Logins persist in the `agent-home` volume:
+
+```sh
+docker compose -f deploy/docker-compose.yml exec -it server npx @anthropic-ai/claude-code   # then /login
+docker compose -f deploy/docker-compose.yml exec -it server npx @openai/codex login
+```
+
+If a CLI's browser login can't call back into the container, use its headless or
+device-code login option.
+
+Put the repos the team works on under `REPOS_DIR` (mounted at `/repos`), and register
+them in the app under **Products & repos** with paths like `/repos/web`.
 
 ### Keycloak client
 

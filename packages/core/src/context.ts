@@ -34,6 +34,7 @@ export interface ContextInput {
 export function buildTurnPrompt(input: ContextInput): string {
   const sections: string[] = [];
   const name = (actor: string) => {
+    if (actor === "workflow") return "The workflow";
     const id = actor.includes(":") ? actor.slice(actor.indexOf(":") + 1) : actor;
     return input.names?.[id] ?? id;
   };

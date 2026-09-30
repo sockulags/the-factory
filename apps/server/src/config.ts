@@ -22,6 +22,14 @@ const Env = z
     OIDC_CLIENT_ID: z.string().optional(),
     DEV_TOKEN: z.string().optional(),
 
+    /** Workflow definitions (workflows/<type>/workflow.yaml). */
+    WORKFLOWS_DIR: z.string().default("./workflows"),
+    /** Where card worktrees are created on this machine. */
+    WORKTREES_DIR: z.string().default("./data/worktrees"),
+    /** Optional JSON file overriding/adding ACP agents (see packages/runner agents.ts). */
+    AGENTS_CONFIG: z.string().optional(),
+    TURN_TIMEOUT_MINUTES: z.coerce.number().positive().default(30),
+
     MIN_CLIENT_VERSION: z.string().default("0.0.0"),
     UPDATES_DIR: z.string().default("./updates"),
     UPDATE_CHANNELS: csv.default(["stable", "beta"]),
