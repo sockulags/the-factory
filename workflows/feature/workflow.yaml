@@ -1,4 +1,6 @@
 # DRAFT — illustrative, schema not final.
+# One thread per step. One worktree per card, shared by all steps.
+# Steps without `on:` advance to the next step when their gate passes.
 type: feature
 columns: [backlog, spec, design, plan, implement, review, docs, done]
 
@@ -38,10 +40,15 @@ steps:
     prompt: ./prompts/review.md
     gate: human
     outputs: [handover]
+    on:
+      approved: docs
+      changes_requested: implement   # re-enters and CONTINUES the implement thread
 
   docs:
     agent: claude
     mode: read-only
     prompt: ../_shared/docs-steward.md
     gate: human
-    outputs: [doc_proposal]
+    outputs: [doc_proposal]        # approved diff is committed to the card branch
+    hooks:
+      exit: [vcs.open_pr]            # provided by the github/gitlab plugin
