@@ -85,6 +85,25 @@ importers:
         specifier: ^4.20.6
         version: 4.23.15
 
+  packages/core:
+    dependencies:
+      '@agentclientprotocol/sdk':
+        specifier: ^1.5.1
+        version: 1.5.1(zod@4.6.5)
+      '@factory/db':
+        specifier: workspace:*
+        version: link:../db
+      '@factory/runner':
+        specifier: workspace:*
+        version: link:../runner
+      drizzle-orm:
+        specifier: ^0.45.3
+        version: 0.45.3(@electric-sql/pglite@0.3.16)(@types/pg@8.23.1)(pg@8.23.1)
+    devDependencies:
+      tsx:
+        specifier: ^4.20.6
+        version: 4.23.15
+
   packages/db:
     dependencies:
       '@electric-sql/pglite':

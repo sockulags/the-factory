@@ -5,7 +5,8 @@
 ```
 apps/server      Hono API server: auth (Keycloak/OIDC), client config, update feed
 apps/desktop     Electron app: main process (auth, updates, IPC) + preload bridge
-packages/runner  ACP client host: spawns agents, permission policy, probe + chat CLI
+packages/runner  ACP client host: spawns agents, permission policy, checkpoints, probe/chat CLI
+packages/core    Thread service: event log, per-agent cursors, context deltas, model switching
 packages/ui      React UI rendered inside the desktop app
 packages/protocol Shared types/schemas: API, desktop bridge, version rules
 packages/db      Drizzle schema + migrations (Postgres; PGlite for dev/tests)
@@ -64,6 +65,20 @@ pnpm chat claude --cwd ../some-repo [--read-only]                  # talk to an 
 
 Agents use the CLI logins on the machine (`claude /login`, `codex login`). See
 [acp-probe.md](acp-probe.md).
+
+### Multi-agent threads
+
+```sh
+pnpm thread --cwd ../some-repo --title "Fix login bug"
+```
+
+Inside the thread, `@claude <message>` lets Claude drive (edit files), `?codex <message>`
+consults Codex read-only, and plain text goes to the last agent. `/log` shows the
+canonical log, `/threads` lists threads, `--thread <id>` reopens one, and Ctrl+C cancels
+a running turn. Each agent keeps its own provider session per thread. Before a turn it
+receives only what it hasn't seen (others' messages and replies, plus a diffstat of
+worktree changes with a `git diff <checkpoint>` hint). If its session can't be
+reattached, it gets a recap instead. Data lives in `~/.factory/cli-db`.
 
 ## Tests
 

@@ -1,6 +1,6 @@
 # The Factory — Plan
 
-Status: draft, living document. Last updated 2026-09-30 (rev 5).
+Status: draft, living document. Last updated 2026-09-30 (rev 6).
 
 ## 1. What we're building
 
@@ -273,10 +273,12 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
    prompt/stream, usage, writes, read-only enforcement, cancel, and resume
    across process restarts. Remaining: run it with real logins and record
    [acp-capabilities.md](acp-capabilities.md). See [acp-probe.md](acp-probe.md).
-2. **Threads + model switch (CLI/API).** Event log, per-agent cursors, delta
-   preamble, checkpoints, driver/consultant modes, rehydration. Built behind
-   the runner interface from the start (in-process implementation).
-   *This is the riskiest and most novel piece, so it goes first.*
+2. **Threads + model switch.** ✅ *Built* (`packages/core` ThreadService,
+   `packages/runner` LocalRunner). Canonical event log in Postgres, per-agent
+   cursors, delta preamble (only what the agent hasn't seen + worktree diffstat),
+   recap when a session can't be reattached, git checkpoints as hidden refs
+   (HEAD/index untouched), write vs consult (read-only) turns, serialized turns,
+   live event stream. Try it with `pnpm thread` (`@claude …` / `?codex …`).
 3. **Workflow engine.** YAML types, step threads, transitions (incl.
    re-entry), gates, handovers, lifecycle (worktree create/delete). Run one
    bug card end to end, including a review → implement loop.

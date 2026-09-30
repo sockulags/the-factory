@@ -104,8 +104,10 @@ const connection = new AgentSideConnection(
       async prompt({ sessionId, prompt }) {
         if (env.FAKE_AUTH === "1") throw RequestError.authRequired();
         const s = await load(sessionId);
-        const text = prompt.map((b) => (b.type === "text" ? b.text : "")).join("");
-        s.history.push({ role: "user", text });
+        const full = prompt.map((b) => (b.type === "text" ? b.text : "")).join("");
+        s.history.push({ role: "user", text: full });
+        // Act only on the actual request, not on quoted context from The Factory.
+        const text = full.replace(/<factory-context>[\s\S]*?<\/factory-context>\s*/, "");
         cancelled.delete(sessionId);
         let reply = "I don't know how to do that.";
         const word = text.match(/exactly the word (\w+)/);
@@ -113,7 +115,10 @@ const connection = new AgentSideConnection(
         const create = text.match(/Create a file named (\S+) .*containing exactly the text: (.*)$/);
         const count = text.match(/Count from 1 to (\d+)/);
 
-        if (word) reply = word[1] ?? "";
+        const echo = text.match(/^Say: ([\s\S]+)$/);
+
+        if (echo) reply = echo[1] ?? "";
+        else if (word) reply = word[1] ?? "";
         else if (plant) {
           s.memory.codeword = plant[1] ?? "";
           reply = "OK";
