@@ -1,0 +1,23 @@
+{
+  "name": "@factory/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "thread": "tsx src/cli/thread.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "^1.5.1",
+    "@factory/db": "workspace:*",
+    "@factory/runner": "workspace:*",
+    "drizzle-orm": "^0.45.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
+  }
+}
