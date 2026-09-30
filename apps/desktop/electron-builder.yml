@@ -1,0 +1,27 @@
+appId: com.thefactory.desktop
+productName: The Factory
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - "!dist/**/*.map"
+  - package.json
+npmRebuild: false
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  # Signing: electron-builder reads WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD (pfx) from the
+  # environment. For Azure Trusted Signing, add `azureSignOptions` here instead.
+nsis:
+  oneClick: true
+  perMachine: false # per-user install: no admin prompt, silent updates
+  artifactName: Factory-Setup-${version}.${ext}
+linux:
+  target: [dir]
+# The real feed URL is set at runtime from the server's client-config
+# (<server>/updates/<channel>). This entry only makes electron-builder emit latest.yml.
+publish:
+  provider: generic
+  url: https://factory.invalid/updates/stable

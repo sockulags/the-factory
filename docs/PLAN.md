@@ -1,6 +1,6 @@
 # The Factory — Plan
 
-Status: draft, living document. Last updated 2026-09-30 (rev 3).
+Status: draft, living document. Last updated 2026-09-30 (rev 4).
 
 ## 1. What we're building
 
@@ -23,9 +23,10 @@ Work produces two kinds of output:
 | Topic | Decision |
 |---|---|
 | Users | A team from day one; multiple products/repos per factory. |
-| Runtime | One central server on a VPN-protected cloud host (Kubernetes later). Agent execution lives in a separate **runner** (§3.6). |
+| Runtime | One central server on a VPN-protected cloud host: a VM with docker compose first, Kubernetes later. Agent execution lives in a separate **runner** (§3.6). |
 | Client | **Desktop app per team member (Electron)**, with auto-update from the first release. It connects to the server over the VPN and can also host a local runner. |
-| Auth | The desktop app signs in to the server (OIDC via the company IdP, §3.7). The VPN is the network boundary; auth provides identity and attribution. |
+| Auth | **Keycloak** (OIDC). The desktop app signs in via the system browser; the server validates access tokens. The VPN is the network boundary; auth provides identity and attribution. |
+| Platforms | **Windows** only for now (NSIS installer, per-user install). |
 | Subscriptions | Enterprise licenses; shared account per provider when hosted. |
 | Language | TypeScript end to end. |
 | DB | Postgres on the server. PGlite (embedded Postgres) for local dev and tests. Same schema and migrations. |
@@ -261,10 +262,11 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
 
 ## 6. Phases
 
-0. **Walking skeleton, shipped.** Monorepo, server with health + auth,
-   Electron app that logs in and shows "connected as …", CI that builds,
-   signs and publishes releases, and auto-update working end to end. From
-   here on, every merged feature reaches the team automatically.
+0. **Walking skeleton, shipped.** ✅ *Built.* Monorepo, server with health +
+   Keycloak auth, Electron app that signs in and shows "connected as …", CI
+   that builds and publishes releases, auto-update fed by the server. From
+   here on, every merged feature reaches the team automatically. Remaining:
+   first real release on the VPN server, Windows signing certificate.
 1. **ACP spike (CLI).** Spawn two different agents in the same worktree.
    Prove: prompt/stream, permission handling, `session/load` / resume,
    cancellation, usage reporting. Output: a capability matrix per adapter.
@@ -285,11 +287,6 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
 
 ## 7. Open questions
 
-1. **Identity provider:** Entra ID, Okta, Google Workspace, Keycloak…? This
-   decides the OIDC setup for phase 0.
-2. **Team OS mix:** macOS / Windows / Linux? This decides signing certificates
-   and build targets.
-3. **Server host:** a plain VM (docker compose) first, or straight to
-   Kubernetes? Leaning VM + compose for phase 0–4.
-4. **Automatic compaction threshold:** when to reseed a step thread from its
+1. **Automatic compaction threshold:** when to reseed a step thread from its
    handover instead of continuing it (tokens? re-entry count?). Measure first.
+2. **Windows code signing:** a .pfx certificate, or Azure Trusted Signing?

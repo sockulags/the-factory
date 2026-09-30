@@ -1,0 +1,42 @@
+# Production-ish stack for the VPN server: Postgres + Factory server.
+# Keycloak is your company's existing instance; point OIDC_ISSUER at its realm.
+#   cp deploy/.env.example deploy/.env && edit
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: factory
+      POSTGRES_USER: factory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U factory"]
+      interval: 5s
+      retries: 10
+
+  server:
+    image: ${FACTORY_SERVER_IMAGE:-ghcr.io/sockulags/the-factory-server:latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL}
+      DATABASE_URL: postgres://factory:${POSTGRES_PASSWORD}@postgres:5432/factory
+      AUTH_MODE: oidc
+      OIDC_ISSUER: ${OIDC_ISSUER:?set OIDC_ISSUER}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-factory-desktop}
+      MIN_CLIENT_VERSION: ${MIN_CLIENT_VERSION:-0.0.0}
+      UPDATE_MIRROR_REPO: ${UPDATE_MIRROR_REPO:-sockulags/the-factory}
+      UPDATE_MIRROR_TOKEN: ${UPDATE_MIRROR_TOKEN:-}
+    volumes:
+      - updates:/updates
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:8787:8787"
+
+volumes:
+  pgdata:
+  updates:
