@@ -1,3 +1,4 @@
+export * from "./api.js";
 export * from "./client-config.js";
 export * from "./desktop-bridge.js";
 export * from "./headers.js";

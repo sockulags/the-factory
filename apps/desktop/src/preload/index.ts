@@ -16,6 +16,15 @@ const bridge: DesktopBridge = {
   checkForUpdates: () => ipcRenderer.invoke(BRIDGE_CHANNELS.checkForUpdates),
   installUpdate: () => ipcRenderer.invoke(BRIDGE_CHANNELS.installUpdate),
   api: (apiPath) => ipcRenderer.invoke(BRIDGE_CHANNELS.api, apiPath),
+  request: (method, apiPath, body) =>
+    ipcRenderer.invoke(BRIDGE_CHANNELS.request, method, apiPath, body),
+  openStream: (apiPath) => ipcRenderer.invoke(BRIDGE_CHANNELS.openStream, apiPath),
+  closeStream: (id) => ipcRenderer.invoke(BRIDGE_CHANNELS.closeStream, id),
+  onStreamEvent(listener) {
+    const handler = (_e: unknown, id: string, data: unknown) => listener(id, data);
+    ipcRenderer.on(BRIDGE_CHANNELS.streamEvent, handler);
+    return () => ipcRenderer.off(BRIDGE_CHANNELS.streamEvent, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld("factory", bridge);

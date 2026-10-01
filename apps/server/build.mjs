@@ -6,6 +6,8 @@ import { build } from "esbuild";
 const workspacePackages = [
   "../../packages/db/package.json",
   "../../packages/protocol/package.json",
+  "../../packages/core/package.json",
+  "../../packages/runner/package.json",
   "./package.json",
 ];
 const external = new Set();

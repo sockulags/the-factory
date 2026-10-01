@@ -10,6 +10,8 @@ import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { AuthError, type Authenticator, type Identity } from "./auth.js";
 import type { ServerConfig } from "./config.js";
+import { factoryRoutes } from "./routes.js";
+import type { FactoryServices } from "./services.js";
 import { serveUpdateFile } from "./updates.js";
 
 export interface AppDeps {
@@ -17,11 +19,13 @@ export interface AppDeps {
   db: Db;
   authenticate: Authenticator;
   serverVersion: string;
+  /** Board, threads and workflows. Omitted in tests that only cover auth/updates. */
+  factory?: FactoryServices;
 }
 
-type Env = { Variables: { identity: Identity } };
+type Env = { Variables: { identity: Identity; userId: string } };
 
-export function createApp({ config, db, authenticate, serverVersion }: AppDeps) {
+export function createApp({ config, db, authenticate, serverVersion, factory }: AppDeps) {
   const app = new Hono<Env>();
 
   const clientConfig: ClientConfig = {
@@ -88,6 +92,25 @@ export function createApp({ config, db, authenticate, serverVersion }: AppDeps) 
     };
     return c.json(me);
   });
+
+  if (factory) {
+    // Known users by IdP subject → our user id; refreshed on /api/me.
+    const userIds = new Map<string, string>();
+    const withUser = createMiddleware<Env>(async (c, next) => {
+      const identity = c.get("identity");
+      let id = userIds.get(identity.subject);
+      if (!id) {
+        id = (await upsertUserFromIdentity(db, identity)).id;
+        userIds.set(identity.subject, id);
+      }
+      c.set("userId", id);
+      await next();
+    });
+    const api = new Hono<Env>();
+    api.use("*", requireAuth, withUser);
+    api.route("/", factoryRoutes(factory));
+    app.route("/api", api);
+  }
 
   // Update feed for electron-updater's generic provider: /updates/<channel>/<file>
   app.get("/updates/:channel/:file", (c) =>

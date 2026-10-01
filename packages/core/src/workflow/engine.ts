@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { Runner } from "@factory/runner";
 import type { Board, Card, CardState, Repo } from "../board.js";
-import type { AgentMessagePayload } from "../events.js";
+import { type AgentMessagePayload, WORKFLOW_ACTOR } from "../events.js";
 import type { ThreadService } from "../thread-service.js";
 import {
   DONE,
@@ -227,13 +227,26 @@ export class WorkflowEngine {
     }
 
     const mode = step.mode;
-    await threads.send({ threadId: thread.id, agentId: step.agent, text: message, mode });
+    await threads.send({
+      actor: WORKFLOW_ACTOR,
+      threadId: thread.id,
+      agentId: step.agent,
+      text: message,
+      mode,
+    });
     if (step.consult.length) {
       const consult = renderTemplate(wf.shared.consult, { driver: step.agent });
       for (const agentId of step.consult) {
-        await threads.send({ threadId: thread.id, agentId, text: consult, mode: "consult" });
+        await threads.send({
+          actor: WORKFLOW_ACTOR,
+          threadId: thread.id,
+          agentId,
+          text: consult,
+          mode: "consult",
+        });
       }
       await threads.send({
+        actor: WORKFLOW_ACTOR,
         threadId: thread.id,
         agentId: step.agent,
         text: wf.shared.revise,
@@ -347,7 +360,13 @@ export class WorkflowEngine {
   ): Promise<HandoverContent> {
     const { threads } = this.options;
     const ask = async (text: string) => {
-      const reply = await threads.send({ threadId, agentId: step.agent, text, mode: "consult" });
+      const reply = await threads.send({
+        actor: WORKFLOW_ACTOR,
+        threadId,
+        agentId: step.agent,
+        text,
+        mode: "consult",
+      });
       return (reply.payload as AgentMessagePayload).text;
     };
     const first = await ask(

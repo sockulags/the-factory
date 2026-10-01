@@ -1,7 +1,7 @@
 import type { SessionUpdate } from "@agentclientprotocol/sdk";
 import { type Db, schema } from "@factory/db";
 import type { Runner } from "@factory/runner";
-import { and, asc, eq, gt, max } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, max } from "drizzle-orm";
 import { buildTurnPrompt } from "./context.js";
 import {
   type AgentMessagePayload,
@@ -13,7 +13,7 @@ import {
   userActor,
 } from "./events.js";
 
-const { threads, threadEvents, agentSessions } = schema;
+const { threads, threadEvents, agentSessions, users } = schema;
 
 export type Thread = typeof threads.$inferSelect;
 
@@ -29,7 +29,8 @@ export interface SendRequest {
   agentId: string;
   text: string;
   mode?: TurnMode;
-  userId?: string | null;
+  userId?: string | null /** Overrides the actor, e.g. "workflow" for messages the engine sends. */;
+  actor?: string;
 }
 
 export interface ThreadServiceOptions {
@@ -98,6 +99,21 @@ export class ThreadService {
     return this.options.db.select().from(agentSessions).where(eq(agentSessions.threadId, threadId));
   }
 
+  /** Display names keyed by user id, for the users who appear in `events`. */
+  async userNames(events: ThreadEvent[]): Promise<Record<string, string>> {
+    const ids = [
+      ...new Set(
+        events
+          .map((e) => e.actor)
+          .filter((a) => a.startsWith("user:") && a !== "user:local")
+          .map((a) => a.slice(5)),
+      ),
+    ].filter((id) => /^[0-9a-f-]{36}$/.test(id));
+    if (!ids.length) return {};
+    const rows = await this.options.db.select().from(users).where(inArray(users.id, ids));
+    return Object.fromEntries(rows.map((u) => [u.id, u.name ?? u.username]));
+  }
+
   subscribe(threadId: string, listener: (e: LiveEvent) => void): () => void {
     let set = this.subscribers.get(threadId);
     if (!set) {
@@ -138,7 +154,7 @@ export class ThreadService {
 
     const userEvent = await this.append(thread.id, {
       kind: "user_message",
-      actor: userActor(req.userId),
+      actor: req.actor ?? userActor(req.userId),
       payload: { text: req.text, to: req.agentId, mode },
     });
 
@@ -177,7 +193,7 @@ export class ThreadService {
         events: unseen,
         diff,
         handover: continuing ? null : await this.options.handoverFor?.(thread.id),
-        names: this.options.names,
+        names: { ...this.options.names, ...(await this.userNames(unseen)) },
       });
 
       if (mode === "write" && thread.driverAgentId !== req.agentId) {

@@ -1,6 +1,6 @@
 # The Factory — Plan
 
-Status: draft, living document. Last updated 2026-09-30 (rev 7).
+Status: draft, living document. Last updated 2026-09-30 (rev 8).
 
 ## 1. What we're building
 
@@ -286,8 +286,13 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
    auto/human/checks gates (failing checks loop back), hooks, per-card
    worktrees (created on demand, removed on close). Try it with
    `pnpm factory`.
-4. **Board UI** (in the desktop app). Backlog, kanban, card view with live
-   threads, gate approval.
+4. **Board UI** ✅ *Built.* Server API (products, repos, cards, gate
+   decisions, threads, messages with agent/mode switch) and server-sent-event
+   streams (board changes, live thread output) — the runner runs in-process with
+   the server (shared subscriptions). Desktop: product setup, kanban board
+   (status columns, or a type's steps as columns with drag-to-move), card panel
+   with step progress, gate actions, live threads with agent + Consult/Drive
+   switch, "what it saw" context view, handovers and history.
 5. **Docs steward.** Doc-change proposals + review queue, context selection.
 6. **Plugins.** Plugin interface; first plugin = GitHub or GitLab (open PR on
    done), then Jira/Confluence.

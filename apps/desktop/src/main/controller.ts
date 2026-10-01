@@ -177,16 +177,24 @@ export class DesktopController {
   }
 
   /** Authenticated GET against the server's /api. Refreshes the token once on 401. */
-  async api<T>(path: string): Promise<T> {
+  api<T>(path: string): Promise<T> {
+    return this.request<T>("GET", path);
+  }
+
+  /** Authenticated request against the server's /api. Refreshes the token once on 401. */
+  async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     if (!path.startsWith("/")) throw new Error("api path must start with /");
     const { serverUrl } = this.requireConnection();
     for (let attempt = 0; attempt < 2; attempt++) {
       const token = await this.validAccessToken(attempt > 0);
       const res = await this.fetch(`${serverUrl}/api${path}`, {
+        method,
         headers: {
           authorization: `Bearer ${token}`,
           [CLIENT_VERSION_HEADER]: this.deps.appVersion,
+          ...(body !== undefined ? { "content-type": "application/json" } : {}),
         },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
       });
       if (res.status === 401 && attempt === 0 && this.session?.tokens.refreshToken) continue;
       if (res.status === 401) {
@@ -200,10 +208,54 @@ export class DesktopController {
         void this.deps.updater.check();
         throw new ApiError(res.status, "This version of The Factory is too old. Updating…");
       }
-      if (!res.ok) throw new ApiError(res.status, `Server error (HTTP ${res.status})`);
+      if (!res.ok) {
+        const detail = (await res.json().catch(() => ({}))) as { detail?: string };
+        throw new ApiError(res.status, detail.detail ?? `Server error (HTTP ${res.status})`);
+      }
       return (await res.json()) as T;
     }
     throw new ApiError(401, "unreachable");
+  }
+
+  /**
+   * Opens a server-sent-event stream and calls `onData` with each JSON payload.
+   * Reconnects with backoff until the returned function is called.
+   */
+  openStream(path: string, onData: (data: unknown) => void): () => void {
+    const controller = new AbortController();
+    let stopped = false;
+    const run = async () => {
+      let delay = 1000;
+      while (!stopped) {
+        try {
+          const { serverUrl } = this.requireConnection();
+          const token = await this.validAccessToken(false);
+          const res = await this.fetch(`${serverUrl}/api${path}`, {
+            headers: {
+              authorization: `Bearer ${token}`,
+              accept: "text/event-stream",
+              [CLIENT_VERSION_HEADER]: this.deps.appVersion,
+            },
+            signal: controller.signal,
+          });
+          if (res.status === 401) await this.validAccessToken(true);
+          else if (res.ok && res.body) {
+            delay = 1000;
+            await readSse(res.body, onData);
+          }
+        } catch {
+          // network drop, abort, or signed out: retry below unless stopped
+        }
+        if (stopped) break;
+        await new Promise((r) => setTimeout(r, delay));
+        delay = Math.min(delay * 2, 30_000);
+      }
+    };
+    void run();
+    return () => {
+      stopped = true;
+      controller.abort();
+    };
   }
 
   private async refreshMe(): Promise<void> {
@@ -317,4 +369,37 @@ export function normalizeServerUrl(raw: string): string {
   if (url.protocol !== "https:" && url.protocol !== "http:")
     throw new Error("Use an http(s) address");
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+}
+
+/** Parses a text/event-stream body; ignores comments, pings and non-JSON data. */
+export async function readSse(
+  body: ReadableStream<Uint8Array>,
+  onData: (data: unknown) => void,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      boundary = buffer.indexOf("\n\n");
+      const lines = block.split("\n");
+      if (lines.includes("event: ping")) continue;
+      const data = lines
+        .filter((l) => l.startsWith("data:"))
+        .map((l) => l.slice(5).replace(/^ /, ""))
+        .join("\n");
+      if (!data) continue;
+      try {
+        onData(JSON.parse(data));
+      } catch {
+        // not JSON: ignore
+      }
+    }
+  }
 }
