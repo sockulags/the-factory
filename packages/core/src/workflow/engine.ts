@@ -183,6 +183,49 @@ export class WorkflowEngine {
     });
   }
 
+  /**
+   * Call once at startup. Cards that were mid-step when the server stopped lost their
+   * agent turn; each is resumed in its step's thread (the agent sees the cut-off turn in
+   * its delta). A card interrupted again before its resumed step got anywhere is blocked
+   * instead, so a step that crashes the server can't loop. Returns the affected card keys.
+   */
+  async recover(): Promise<string[]> {
+    const { board, runner } = this.options;
+    const stuck = await board.cardsInState("running");
+    for (const card of stuck) {
+      const step = card.step;
+      // With a remote runner the agent may still be working on the old turn: stop it.
+      const thread = step ? await board.stepThread(card.id, step) : null;
+      if (thread) {
+        for (const s of await this.options.threads.sessions(thread.id)) {
+          await runner.cancel(s.agentId, s.acpSessionId).catch(() => undefined);
+        }
+      }
+      const progress = (await board.events(card.id)).filter((e) => e.kind !== "step_started");
+      const again = progress.at(-1)?.kind === "interrupted";
+      await board.addEvent(card.id, "interrupted", "system", { step, resumed: !again && !!step });
+      if (again || !step) {
+        await board.updateCard(card.id, { state: "blocked" });
+        await board.addEvent(card.id, "error", "system", {
+          step,
+          message: again
+            ? "The server restarted twice while this step was running. Press Retry to run it again."
+            : "The server restarted while this card was running.",
+        });
+        this.changed(card.id);
+        continue;
+      }
+      this.enqueue(card.id, async () => {
+        await this.runStep(
+          await this.card(card.id),
+          step,
+          "The Factory restarted while you were working on this step, so your last turn was cut off. Check the worktree for what you already did, then finish the step.",
+        );
+      });
+    }
+    return stuck.map((c) => c.key);
+  }
+
   /** Resolves when every queued operation for the card has finished. */
   async whenIdle(cardId: string): Promise<void> {
     while (this.queues.has(cardId)) await this.queues.get(cardId);

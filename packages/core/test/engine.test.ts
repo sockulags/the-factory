@@ -205,6 +205,35 @@ describe("WorkflowEngine", () => {
     expect(current.state).toBe("awaiting_gate");
     expect(current.step).toBe("review");
   }, 60_000);
+
+  it("resumes a card a restart left running, but blocks it if that keeps happening", async () => {
+    const card = await board.createCard({ productId, repoId, type: "lite", title: "Restarted" });
+    await engine.start(card.id);
+    await engine.whenIdle(card.id);
+    const thread = await board.stepThread(card.id, "triage");
+    // Simulate a restart mid-step: the database still says "running", nothing is queued.
+    await board.updateCard(card.id, { state: "running" });
+    expect(await engine.recover()).toEqual([card.key]);
+    await engine.whenIdle(card.id);
+    let current = await reload(card);
+    expect(current).toMatchObject({ step: "triage", state: "awaiting_gate" });
+    expect(await board.stepThread(card.id, "triage")).toMatchObject({ id: thread?.id });
+    const kinds = (await board.events(card.id)).map((e) => e.kind);
+    expect(kinds.slice(kinds.indexOf("interrupted"))).toContain("step_started");
+
+    // Interrupted again right after being resumed: block instead of looping.
+    await board.addEvent(card.id, "interrupted", "system", { step: "triage", resumed: true });
+    await board.addEvent(card.id, "step_started", "system", { step: "triage", reentry: true });
+    await board.updateCard(card.id, { state: "running" });
+    await engine.recover();
+    await engine.whenIdle(card.id);
+    current = await reload(card);
+    expect(current.state).toBe("blocked");
+    expect((await board.events(card.id)).at(-1)?.payload).toMatchObject({
+      message: expect.stringContaining("Retry"),
+    });
+    expect(await engine.recover()).toEqual([]);
+  }, 60_000);
 });
 
 describe("shipped workflows", () => {

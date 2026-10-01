@@ -153,6 +153,12 @@ export class Board {
     return rows.map((r) => ({ ...r, key: `${product?.key ?? "?"}-${r.number}` }));
   }
 
+  /** Cards in `state` across all products (e.g. the ones a restart left "running"). */
+  async cardsInState(state: string): Promise<Card[]> {
+    const rows = await this.db.select().from(cards).where(eq(cards.state, state));
+    return Promise.all(rows.map((r) => this.withKey(r)));
+  }
+
   async updateCard(
     id: string,
     patch: Partial<

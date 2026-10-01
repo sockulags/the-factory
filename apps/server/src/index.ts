@@ -67,6 +67,12 @@ const server = serve({ fetch: app.fetch, hostname: config.HOST, port: config.POR
   console.log(`factory server ${pkg.version} listening on http://${info.address}:${info.port}`);
 });
 
+// Cards that were mid-step when the server last stopped.
+factory.engine.recover().then(
+  (keys) => keys.length && console.log(`resumed after restart: ${keys.join(", ")}`),
+  (err) => console.error("recovering running cards failed:", (err as Error).message),
+);
+
 const shutdown = () => {
   server.close();
   void factory.runner.shutdown();
