@@ -11,6 +11,7 @@ import {
   diffPatch,
   ensureWorktree,
   inspectRepo,
+  listsWorktree,
   restorePaths,
 } from "../src/git.js";
 
@@ -77,5 +78,26 @@ describe("git helpers", () => {
     await expect(ensureWorktree(missing, path.join(missing, "wt"), "b", "main")).rejects.toThrow(
       `folder not found: ${missing}`,
     );
+  });
+
+  it("recognizes an existing worktree whatever the slashes or case (Windows)", () => {
+    const out =
+      "worktree C:/Tools/repo\nHEAD abc\n\nworktree C:/Tools/the-factory/data/worktrees/ef-1\nbranch refs/heads/x\n";
+    expect(listsWorktree(out, "C:\\Tools\\the-factory\\data\\worktrees\\ef-1", "win32")).toBe(true);
+    expect(listsWorktree(out, "c:\\tools\\THE-FACTORY\\data\\worktrees\\ef-1", "win32")).toBe(true);
+    expect(listsWorktree(out, "C:\\Tools\\the-factory\\data\\worktrees\\ef-2", "win32")).toBe(
+      false,
+    );
+    expect(listsWorktree("worktree /srv/wt/ef-1\n", "/srv/wt/ef-1/", "linux")).toBe(true);
+  });
+
+  it("reuses a card's worktree on the next step", async () => {
+    const dir = await repo();
+    const base = await git(dir, "symbolic-ref", "--short", "HEAD");
+    const wt = path.join(await mkdtemp(path.join(tmpdir(), "wt-")), "ef-1");
+    await ensureWorktree(dir, wt, "factory/ef-1", base);
+    await writeFile(path.join(wt, "work.txt"), "keep me\n");
+    await ensureWorktree(dir, wt, "factory/ef-1", base);
+    expect(await readFile(path.join(wt, "work.txt"), "utf8")).toBe("keep me\n");
   });
 });
