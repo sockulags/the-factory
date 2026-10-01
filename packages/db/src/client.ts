@@ -1,3 +1,4 @@
+import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
@@ -35,6 +36,8 @@ export async function openDb({
 }: OpenDbOptions): Promise<DbHandle> {
   if (url.startsWith("pglite:")) {
     const location = url.slice("pglite:".length);
+    // PGlite doesn't create missing parent folders; a fresh checkout has no data/ yet.
+    if (location !== "memory") mkdirSync(location, { recursive: true });
     const client = location === "memory" ? new PGlite() : new PGlite(location);
     const db = drizzlePglite(client, { schema });
     return {
