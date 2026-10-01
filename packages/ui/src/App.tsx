@@ -1,6 +1,7 @@
 import type { DesktopBridge, DesktopState, UpdateStatus } from "@factory/protocol";
 import { type FormEvent, useId, useState } from "react";
 import { getBridge, useDesktopState } from "./bridge.js";
+import { Workspace } from "./workspace/Workspace.js";
 
 export function App() {
   const bridge = getBridge();
@@ -19,12 +20,20 @@ function Shell({ bridge }: { bridge: DesktopBridge }) {
   const state = useDesktopState(bridge);
   if (!state) return null;
 
+  if (state.me && state.clientConfig && !state.updateRequired) {
+    return (
+      <div className="app">
+        <UpdateBanner update={state.update} bridge={bridge} />
+        <Workspace bridge={bridge} state={state} />
+      </div>
+    );
+  }
+
   let body: React.ReactNode;
   if (state.updateRequired) body = <UpdateRequired state={state} bridge={bridge} />;
   else if (!state.serverUrl || !state.clientConfig)
     body = <Connect state={state} bridge={bridge} />;
-  else if (!state.me) body = <SignIn state={state} bridge={bridge} />;
-  else body = <Home state={state} bridge={bridge} />;
+  else body = <SignIn state={state} bridge={bridge} />;
 
   return (
     <div className="app">
@@ -95,32 +104,6 @@ function SignIn({ state, bridge }: ScreenProps) {
         Use a different server
       </button>
     </form>
-  );
-}
-
-function Home({ state, bridge }: ScreenProps) {
-  const me = state.me;
-  if (!me) return null;
-  return (
-    <div className="stack">
-      <p data-testid="connected-as">
-        Connected as <strong>{me.name ?? me.username}</strong>
-      </p>
-      <p className="muted">{state.serverUrl}</p>
-      {state.clientConfig && state.clientConfig.updates.channels.length > 1 && (
-        <label className="row">
-          Update channel
-          <select value={state.channel} onChange={(e) => void bridge.setChannel(e.target.value)}>
-            {state.clientConfig.updates.channels.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-      )}
-      <button type="button" className="secondary" onClick={() => void bridge.signOut()}>
-        Sign out
-      </button>
-    </div>
   );
 }
 

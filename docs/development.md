@@ -4,6 +4,7 @@
 
 ```
 apps/server      Hono API server: auth (Keycloak/OIDC), client config, update feed
+apps/runner      Runner service: agents + worktrees behind the runner protocol
 apps/desktop     Electron app: main process (auth, updates, IPC) + preload bridge
 packages/runner  ACP client host: spawns agents, permission policy, checkpoints, probe/chat CLI
 packages/core    Threads (event log, cursors, deltas), board store, workflow engine, CLIs
@@ -49,6 +50,13 @@ pnpm dev:server                                          # .env defaults point a
 ```sh
 pnpm dev:desktop    # builds UI + main, launches Electron; enter http://localhost:8787
 ```
+
+After signing in you get the board. **Products & repos** registers a product and the
+path of its repo (as seen by the server). **New card** creates a card in the backlog;
+**Start** (or dragging it onto the first step) runs its workflow. The card panel shows
+the step's live thread. You can switch agent and mode (Consult = read-only,
+Drive = may edit) for any message, approve or request changes at gates, and read
+handovers and history.
 
 For UI hot reload, run `pnpm dev:ui` and start the app with
 `FACTORY_UI_DEV_URL=http://localhost:5173`.
@@ -140,6 +148,33 @@ cp deploy/.env.example deploy/.env      # fill in PUBLIC_URL, OIDC_ISSUER, passw
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
 ```
 
+### Kubernetes, and a separate runner
+
+On Kubernetes, agents run in their own **runner** service (`apps/runner`, image
+`the-factory-runner`), and the server reaches it with `RUNNER_URL` + `RUNNER_TOKEN`.
+See [deploy/k8s/README.md](../deploy/k8s/README.md). Locally, run `pnpm dev:runner`
+(with `RUNNER_TOKEN` set) and point the server at it the same way. Without `RUNNER_URL`
+the server runs agents itself, as in the compose setup.
+
+### Agent logins on the server
+
+Agents run inside the server container and use the team's shared subscriptions. Sign
+each CLI in once. Logins persist in the `agent-home` volume:
+
+```sh
+docker compose -f deploy/docker-compose.yml exec -it server npx @anthropic-ai/claude-code   # then /login
+docker compose -f deploy/docker-compose.yml exec -it server npx @openai/codex login
+```
+
+If a CLI's browser login can't call back into the container, use its headless or
+device-code login option.
+
+Put the repos the team works on under `REPOS_DIR` (mounted at `/repos`), and register
+them in the app under **Products & repos** with paths like `/repos/web`.
+
+Integrations (GitHub/GitLab PRs, Jira via MCP, …) are configured per product in the
+app. Their tokens go in `deploy/.env` (see [plugins.md](plugins.md)).
+
 ### Keycloak client
 
 Create (or import from `deploy/keycloak/factory-realm.json`) a client:
@@ -151,6 +186,10 @@ Create (or import from `deploy/keycloak/factory-realm.json`) a client:
 | Standard flow | On; direct access grants off |
 | PKCE method | S256 |
 | Valid redirect URIs | `http://127.0.0.1:*` (loopback, any port, per RFC 8252) |
+
+Give people who should manage products, repos and integrations the `factory-admin` realm
+role (or set `ADMIN_ROLE` to a role you already use). Everyone else can create and work
+cards.
 
 The app sends access tokens to the server. The server accepts them when `azp` (or
 `aud`) is `factory-desktop` and the issuer matches `OIDC_ISSUER`. Realm roles and the

@@ -1,6 +1,6 @@
 # The Factory — Plan
 
-Status: draft, living document. Last updated 2026-09-30 (rev 7).
+Status: draft, living document. Last updated 2026-09-30 (rev 12).
 
 ## 1. What we're building
 
@@ -286,13 +286,33 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
    auto/human/checks gates (failing checks loop back), hooks, per-card
    worktrees (created on demand, removed on close). Try it with
    `pnpm factory`.
-4. **Board UI** (in the desktop app). Backlog, kanban, card view with live
-   threads, gate approval.
-5. **Docs steward.** Doc-change proposals + review queue, context selection.
-6. **Plugins.** Plugin interface; first plugin = GitHub or GitLab (open PR on
-   done), then Jira/Confluence.
-7. **Team & ops.** Roles, multi-product views, usage dashboards, k8s
-   deployment (runner as pod, worktrees on volumes), desktop runner mode.
+4. **Board UI** ✅ *Built.* Server API (products, repos, cards, gate
+   decisions, threads, messages with agent/mode switch) and server-sent-event
+   streams (board changes, live thread output) — the runner runs in-process with
+   the server (shared subscriptions). Desktop: product setup, kanban board
+   (status columns, or a type's steps as columns with drag-to-move), card panel
+   with step progress, gate actions, live threads with agent + Consult/Drive
+   switch, "what it saw" context view, handovers and history.
+5. **Docs steward.** ✅ *Built.* Docs steps turn their `docs/` diff into a
+   proposal (outside changes flagged); reviewers approve (committed), request
+   changes (continues the thread, same base) or discard (reverted). Approved
+   write steps commit to the card branch. Prompts get `{{docs.index}}` and the
+   most relevant pages (`{{docs.relevant}}`).
+6. **Plugins.** ✅ *Built.* Per-product plugins with hooks, agent tools
+   (MCP servers) and instructions; secrets referenced by env var name. Built-in:
+   GitHub and GitLab (`vcs.open_pr`: push + PR/MR + card link), MCP (e.g.
+   Jira/Confluence via Atlassian's MCP server), instructions, webhook. See
+   [plugins.md](plugins.md).
+7. **Team & ops.**
+   - 7a ✅ *Built.* Admin role (`ADMIN_ROLE`, default `factory-admin` in
+     Keycloak) gates products, repos and integrations; everyone works cards.
+     Usage view: turns, tokens, reported cost and agent time by agent, card
+     and day, per product or overall.
+   - 7b ✅ *Built.* Runner protocol over HTTP (JSON RPC; prompts stream
+     NDJSON updates) with a shared token; `apps/runner` service and image; the
+     server uses it when `RUNNER_URL` is set (in-process otherwise).
+     Kubernetes manifests (`deploy/k8s`). Later: the desktop runner for
+     personal subscriptions (same protocol, one runner per person).
 
 ## 7. Open questions
 

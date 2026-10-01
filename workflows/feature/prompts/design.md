@@ -4,6 +4,12 @@ Propose a technical design for this feature. Read the relevant code first; do no
 
 {{handover.previous}}
 
+{{#if docs.relevant}}
+Relevant product documentation (may be out of date — the code is the truth):
+
+{{docs.relevant}}
+{{/if}}
+
 Cover:
 1. The approach in a few sentences, and why it fits this codebase.
 2. The components/files that change or get added, and their responsibilities.

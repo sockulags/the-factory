@@ -2,13 +2,16 @@ import { type Db, schema } from "@factory/db";
 import { and, asc, desc, eq, max } from "drizzle-orm";
 import { type HandoverContent, handoverToMarkdown } from "./workflow/handover.js";
 
-const { products, repos, cards, cardEvents, handovers, threads } = schema;
+const { products, repos, cards, cardEvents, handovers, threads, docProposals, externalLinks } =
+  schema;
 
 export type Product = typeof products.$inferSelect;
 export type Repo = typeof repos.$inferSelect;
 export type CardRow = typeof cards.$inferSelect;
 export type Card = CardRow & { key: string };
 export type CardEvent = typeof cardEvents.$inferSelect;
+export type DocProposal = typeof docProposals.$inferSelect;
+export type ExternalLink = typeof externalLinks.$inferSelect;
 export type HandoverRow = Omit<typeof handovers.$inferSelect, "content"> & {
   content: HandoverContent;
 };
@@ -257,6 +260,91 @@ export class Board {
     if (!thread?.cardId) return null;
     const latest = await this.latestHandover(thread.cardId);
     return latest ? handoverToMarkdown(latest.content, `Handover from ${latest.step}`) : null;
+  }
+
+  async saveDocProposal(
+    input: Omit<
+      typeof docProposals.$inferInsert,
+      "id" | "status" | "createdAt" | "reviewedBy" | "reviewedAt"
+    >,
+  ): Promise<DocProposal> {
+    // A new proposal for the step replaces any still-pending one.
+    await this.db
+      .update(docProposals)
+      .set({ status: "superseded" })
+      .where(
+        and(
+          eq(docProposals.cardId, input.cardId),
+          eq(docProposals.step, input.step),
+          eq(docProposals.status, "pending"),
+        ),
+      );
+    const [row] = await this.db.insert(docProposals).values(input).returning();
+    if (!row) throw new Error("failed to save doc proposal");
+    return row;
+  }
+
+  async pendingDocProposal(cardId: string, step: string): Promise<DocProposal | null> {
+    const [row] = await this.db
+      .select()
+      .from(docProposals)
+      .where(
+        and(
+          eq(docProposals.cardId, cardId),
+          eq(docProposals.step, step),
+          eq(docProposals.status, "pending"),
+        ),
+      )
+      .orderBy(desc(docProposals.createdAt));
+    return row ?? null;
+  }
+
+  async reviewDocProposal(
+    id: string,
+    status: "approved" | "discarded",
+    reviewedBy: string,
+  ): Promise<void> {
+    await this.db
+      .update(docProposals)
+      .set({ status, reviewedBy, reviewedAt: new Date() })
+      .where(eq(docProposals.id, id));
+  }
+
+  docProposals(cardId: string): Promise<DocProposal[]> {
+    return this.db
+      .select()
+      .from(docProposals)
+      .where(eq(docProposals.cardId, cardId))
+      .orderBy(asc(docProposals.createdAt));
+  }
+
+  /** Links a card to something in another system; idempotent per (plugin, kind, ref). */
+  async addLink(input: {
+    cardId: string;
+    plugin: string;
+    kind: string;
+    ref: string;
+    url: string;
+    title?: string | null;
+  }) {
+    const existing = (await this.links(input.cardId)).find(
+      (l) => l.plugin === input.plugin && l.kind === input.kind && l.ref === input.ref,
+    );
+    if (existing) return existing;
+    const [row] = await this.db
+      .insert(externalLinks)
+      .values({ ...input, title: input.title ?? null })
+      .returning();
+    if (!row) throw new Error("failed to add link");
+    return row;
+  }
+
+  links(cardId: string): Promise<ExternalLink[]> {
+    return this.db
+      .select()
+      .from(externalLinks)
+      .where(eq(externalLinks.cardId, cardId))
+      .orderBy(asc(externalLinks.createdAt));
   }
 
   private async withKey(row: CardRow): Promise<Card> {

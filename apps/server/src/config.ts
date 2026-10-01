@@ -22,6 +22,20 @@ const Env = z
     OIDC_CLIENT_ID: z.string().optional(),
     DEV_TOKEN: z.string().optional(),
 
+    /** Workflow definitions (workflows/<type>/workflow.yaml). */
+    WORKFLOWS_DIR: z.string().default("./workflows"),
+    /** Where card worktrees are created on this machine. */
+    WORKTREES_DIR: z.string().default("./data/worktrees"),
+    /** Optional JSON file overriding/adding ACP agents (see packages/runner agents.ts). */
+    AGENTS_CONFIG: z.string().optional(),
+    TURN_TIMEOUT_MINUTES: z.coerce.number().positive().default(30),
+    /** A separate runner service (e.g. a pod). Unset: agents run inside this server. */
+    RUNNER_URL: z.url().optional(),
+    RUNNER_TOKEN: z.string().optional(),
+
+    /** Keycloak realm or client role that may manage products, repos and integrations. */
+    ADMIN_ROLE: z.string().default("factory-admin"),
+
     MIN_CLIENT_VERSION: z.string().default("0.0.0"),
     UPDATES_DIR: z.string().default("./updates"),
     UPDATE_CHANNELS: csv.default(["stable", "beta"]),
@@ -36,6 +50,9 @@ const Env = z
         code: "custom",
         message: "AUTH_MODE=oidc requires OIDC_ISSUER and OIDC_CLIENT_ID",
       });
+    }
+    if (env.RUNNER_URL && !env.RUNNER_TOKEN) {
+      ctx.addIssue({ code: "custom", message: "RUNNER_URL requires RUNNER_TOKEN" });
     }
     if (env.AUTH_MODE === "dev" && !env.DEV_TOKEN) {
       ctx.addIssue({ code: "custom", message: "AUTH_MODE=dev requires DEV_TOKEN" });

@@ -7,6 +7,7 @@ import {
   ClientSideConnection,
   type InitializeResponse,
   type LoadSessionResponse,
+  type McpServer,
   type NewSessionResponse,
   ndJsonStream,
   PROTOCOL_VERSION,
@@ -128,8 +129,12 @@ export class AgentProcess {
     return this.stderrTail.join("\n");
   }
 
-  async newSession(cwd: string, mode: SessionMode): Promise<NewSessionResponse> {
-    const res = await this.guard(this.connection.newSession({ cwd, mcpServers: [] }));
+  async newSession(
+    cwd: string,
+    mode: SessionMode,
+    mcpServers: McpServer[] = [],
+  ): Promise<NewSessionResponse> {
+    const res = await this.guard(this.connection.newSession({ cwd, mcpServers }));
     this.sessions.set(res.sessionId, { cwd, mode, turn: null, background: [] });
     return res;
   }
@@ -139,12 +144,11 @@ export class AgentProcess {
     sessionId: string,
     cwd: string,
     mode: SessionMode,
+    mcpServers: McpServer[] = [],
   ): Promise<{ response: LoadSessionResponse | undefined; replayed: SessionUpdate[] }> {
     const state: SessionState = { cwd, mode, turn: null, background: [] };
     this.sessions.set(sessionId, state);
-    const response = await this.guard(
-      this.connection.loadSession({ sessionId, cwd, mcpServers: [] }),
-    );
+    const response = await this.guard(this.connection.loadSession({ sessionId, cwd, mcpServers }));
     return { response: response ?? undefined, replayed: state.background };
   }
 
@@ -153,9 +157,10 @@ export class AgentProcess {
     sessionId: string,
     cwd: string,
     mode: SessionMode,
+    mcpServers: McpServer[] = [],
   ): Promise<ResumeSessionResponse> {
     this.sessions.set(sessionId, { cwd, mode, turn: null, background: [] });
-    return this.guard(this.connection.resumeSession({ sessionId, cwd, mcpServers: [] }));
+    return this.guard(this.connection.resumeSession({ sessionId, cwd, mcpServers }));
   }
 
   setMode(sessionId: string, mode: SessionMode): void {

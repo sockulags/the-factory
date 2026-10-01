@@ -4,6 +4,12 @@ Turn this feature request into a short, testable spec. Investigate the code to g
 
 {{card.body}}
 
+{{#if docs.relevant}}
+Relevant product documentation (may be out of date — the code is the truth):
+
+{{docs.relevant}}
+{{/if}}
+
 Write:
 1. **Problem**: who needs this and why, in two or three sentences.
 2. **Behavior**: what the user can do afterwards, as concrete scenarios (given / when / then).

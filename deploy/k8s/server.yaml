@@ -1,0 +1,58 @@
+# The Factory server: API, board, workflows, update feed. Stateless apart from the
+# update feed volume; state lives in Postgres. Agents run on the runner (runner.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: factory-server
+spec:
+  replicas: 1 # the workflow engine keeps per-card queues in memory: run one replica
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: factory-server }
+  template:
+    metadata:
+      labels: { app: factory-server }
+    spec:
+      containers:
+        - name: server
+          image: factory-server
+          ports:
+            - containerPort: 8787
+          envFrom:
+            - configMapRef: { name: factory-config }
+            - secretRef: { name: factory-secrets }
+          env:
+            - name: RUNNER_URL
+              value: http://factory-runner:8788
+            # Worktree paths are paths on the runner.
+            - name: WORKTREES_DIR
+              value: /data/worktrees
+          volumeMounts:
+            - { name: updates, mountPath: /updates }
+          readinessProbe:
+            httpGet: { path: /health, port: 8787 }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+      volumes:
+        - name: updates
+          persistentVolumeClaim: { claimName: factory-updates }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: factory-updates
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 5Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: factory-server
+spec:
+  selector: { app: factory-server }
+  ports:
+    - port: 80
+      targetPort: 8787

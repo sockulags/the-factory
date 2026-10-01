@@ -106,3 +106,92 @@ export async function removeWorktree(repoPath: string, worktreePath: string): Pr
   await git(repoPath, ["worktree", "remove", "--force", worktreePath]).catch(() => undefined);
   await git(repoPath, ["worktree", "prune"]);
 }
+
+const FACTORY_IDENTITY = {
+  GIT_AUTHOR_NAME: "The Factory",
+  GIT_AUTHOR_EMAIL: "factory@localhost",
+  GIT_COMMITTER_NAME: "The Factory",
+  GIT_COMMITTER_EMAIL: "factory@localhost",
+};
+
+/** Stages everything and commits on the current branch. Returns the commit id, or null if nothing changed. */
+export async function commitAll(cwd: string, message: string): Promise<string | null> {
+  await git(cwd, ["add", "-A", "."]);
+  const staged = await git(cwd, ["diff", "--cached", "--name-only"]);
+  if (!staged) return null;
+  await git(cwd, ["commit", "-q", "-m", message], FACTORY_IDENTITY);
+  return git(cwd, ["rev-parse", "HEAD"]);
+}
+
+/** Unified diff between two snapshots, optionally limited to paths. Truncated at `maxBytes`. */
+export async function diffPatch(
+  cwd: string,
+  from: string,
+  to: string,
+  paths: string[] = [],
+  maxBytes = 200_000,
+): Promise<{ patch: string; truncated: boolean }> {
+  const patch = await git(cwd, ["diff", "--no-color", from, to, "--", ...paths]);
+  return patch.length > maxBytes
+    ? { patch: `${patch.slice(0, maxBytes)}\n… [diff truncated]`, truncated: true }
+    : { patch, truncated: false };
+}
+
+/**
+ * Puts `paths` in the worktree back to how they were in `source` (a snapshot):
+ * modified files are restored, files added since are removed.
+ */
+export async function restorePaths(cwd: string, source: string, paths: string[]): Promise<void> {
+  const current = await checkpoint(cwd, "refs/factory/tmp/restore", "restore point");
+  const changes = await git(cwd, [
+    "diff",
+    "--name-status",
+    "--no-renames",
+    source,
+    current,
+    "--",
+    ...paths,
+  ]);
+  for (const line of changes.split("\n").filter(Boolean)) {
+    const [status, file = ""] = line.split("\t");
+    if (status === "A") await rm(path.join(cwd, file), { force: true });
+    else await git(cwd, ["checkout", source, "--", file]);
+  }
+  await git(cwd, ["update-ref", "-d", "refs/factory/tmp/restore"]);
+  // `git checkout <commit> -- file` also stages it; unstage to leave the index as it was.
+  await git(cwd, ["reset", "-q", "--", ...paths]).catch(() => undefined);
+}
+
+export interface PushAuth {
+  username: string;
+  password: string;
+}
+
+/**
+ * Pushes `branch` to `remote` (a URL or path). Credentials go in an HTTP header for this
+ * one command only, so tokens never land in the repo's config or remote URLs.
+ */
+export async function pushBranch(
+  cwd: string,
+  remote: string,
+  branch: string,
+  auth?: PushAuth,
+): Promise<void> {
+  const extra = auth
+    ? [
+        "-c",
+        `http.extraHeader=Authorization: Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString("base64")}`,
+      ]
+    : [];
+  await git(cwd, [
+    ...extra,
+    "push",
+    "--porcelain",
+    remote,
+    `refs/heads/${branch}:refs/heads/${branch}`,
+  ]);
+}
+
+export async function remoteUrl(cwd: string, name = "origin"): Promise<string | null> {
+  return git(cwd, ["remote", "get-url", name]).catch(() => null);
+}

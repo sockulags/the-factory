@@ -1,0 +1,15 @@
+type: docs-lite
+steps:
+  write:
+    agent: alpha
+    mode: write
+    prompt: prompts/write.md
+    gate: auto
+  docs:
+    agent: alpha
+    mode: write
+    prompt: prompts/docs.md
+    gate: human
+    outputs: [doc_proposal]
+    hooks:
+      exit: [vcs.open_pr]

@@ -40,6 +40,19 @@ export interface DesktopBridge {
   installUpdate(): Promise<void>;
   /** Authenticated GET against the server's /api. */
   api<T = unknown>(path: string): Promise<T>;
+  /** Authenticated request against the server's /api. Rejects with the server's error detail. */
+  request<T = unknown>(
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+    path: string,
+    body?: unknown,
+  ): Promise<T>;
+  /**
+   * Opens a server-sent-event stream under /api (e.g. "/stream", "/threads/<id>/stream").
+   * Reconnects automatically. Returns an id for closeStream; events arrive via onStreamEvent.
+   */
+  openStream(path: string): Promise<string>;
+  closeStream(id: string): Promise<void>;
+  onStreamEvent(listener: (id: string, data: unknown) => void): () => void;
 }
 
 export const BRIDGE_CHANNELS = {
@@ -53,4 +66,8 @@ export const BRIDGE_CHANNELS = {
   checkForUpdates: "factory:check-for-updates",
   installUpdate: "factory:install-update",
   api: "factory:api",
+  request: "factory:request",
+  openStream: "factory:open-stream",
+  closeStream: "factory:close-stream",
+  streamEvent: "factory:stream-event",
 } as const;

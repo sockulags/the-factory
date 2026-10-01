@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   jsonb,
   pgTable,
@@ -151,5 +152,61 @@ export const handovers = pgTable("handovers", {
   step: text("step").notNull(),
   threadId: uuid("thread_id").references(() => threads.id, { onDelete: "set null" }),
   content: jsonb("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Documentation changes an agent proposed in a docs step. A person approves (committed
+ * to the card branch with the step), asks for changes, or discards them (reverted).
+ */
+export const docProposals = pgTable("doc_proposals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  cardId: uuid("card_id")
+    .notNull()
+    .references(() => cards.id, { onDelete: "cascade" }),
+  step: text("step").notNull(),
+  threadId: uuid("thread_id").references(() => threads.id, { onDelete: "set null" }),
+  /** Worktree snapshots the patch was computed between. */
+  baseCheckpoint: text("base_checkpoint").notNull(),
+  headCheckpoint: text("head_checkpoint").notNull(),
+  patch: text("patch").notNull(),
+  files: jsonb("files").$type<{ path: string; added: number; removed: number }[]>().notNull(),
+  /** Files changed outside the docs directory during the step (flagged for the reviewer). */
+  outsideDocs: jsonb("outside_docs").$type<string[]>().notNull().default([]),
+  /** pending | approved | discarded | superseded */
+  status: text("status").notNull().default("pending"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Which integrations a product uses, and their settings. Secrets are env var names, never values. */
+export const pluginConfigs = pgTable(
+  "plugin_configs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    plugin: text("plugin").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("plugin_configs_product_plugin").on(t.productId, t.plugin)],
+);
+
+/** Things in other systems a card is linked to: pull requests, issues, pages. */
+export const externalLinks = pgTable("external_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  cardId: uuid("card_id")
+    .notNull()
+    .references(() => cards.id, { onDelete: "cascade" }),
+  plugin: text("plugin").notNull(),
+  /** e.g. pull_request, merge_request, issue */
+  kind: text("kind").notNull(),
+  ref: text("ref").notNull(),
+  url: text("url").notNull(),
+  title: text("title"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

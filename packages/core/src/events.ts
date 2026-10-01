@@ -62,3 +62,6 @@ export const userActor = (userId: string | null | undefined) =>
   userId ? `user:${userId}` : "user:local";
 export const agentActor = (agentId: string) => `agent:${agentId}`;
 export const actorAgentId = (actor: string) => (actor.startsWith("agent:") ? actor.slice(6) : null);
+
+/** Actor for messages the workflow engine sends (step prompts, handover requests, …). */
+export const WORKFLOW_ACTOR = "workflow";

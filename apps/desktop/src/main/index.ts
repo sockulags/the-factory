@@ -41,6 +41,30 @@ async function main() {
   ipcMain.handle(BRIDGE_CHANNELS.checkForUpdates, () => controller.checkForUpdates());
   ipcMain.handle(BRIDGE_CHANNELS.installUpdate, () => controller.installUpdate());
   ipcMain.handle(BRIDGE_CHANNELS.api, (_e, apiPath: string) => controller.api(String(apiPath)));
+  ipcMain.handle(BRIDGE_CHANNELS.request, (_e, method: string, apiPath: string, body?: unknown) => {
+    if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(method)) throw new Error("bad method");
+    return controller.request(method, String(apiPath), body);
+  });
+  const streams = new Map<string, () => void>();
+  const closeAllStreams = () => {
+    for (const close of streams.values()) close();
+    streams.clear();
+  };
+  let nextStream = 0;
+  ipcMain.handle(BRIDGE_CHANNELS.openStream, (_e, apiPath: string) => {
+    const id = String(++nextStream);
+    streams.set(
+      id,
+      controller.openStream(String(apiPath), (data) =>
+        window?.webContents.send(BRIDGE_CHANNELS.streamEvent, id, data),
+      ),
+    );
+    return id;
+  });
+  ipcMain.handle(BRIDGE_CHANNELS.closeStream, (_e, id: string) => {
+    streams.get(String(id))?.();
+    streams.delete(String(id));
+  });
 
   const createWindow = () => {
     window = new BrowserWindow({
@@ -65,6 +89,11 @@ async function main() {
     window.webContents.on("will-navigate", (event) => event.preventDefault());
     window.on("closed", () => {
       window = null;
+      closeAllStreams();
+    });
+    // A reload drops the renderer's subscriptions, so close their streams too.
+    window.webContents.on("did-start-navigation", (details) => {
+      if (details.isMainFrame && !details.isSameDocument) closeAllStreams();
     });
 
     const devUrl = process.env.FACTORY_UI_DEV_URL;

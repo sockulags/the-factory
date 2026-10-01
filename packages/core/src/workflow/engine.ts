@@ -1,7 +1,8 @@
 import path from "node:path";
 import type { Runner } from "@factory/runner";
 import type { Board, Card, CardState, Repo } from "../board.js";
-import type { AgentMessagePayload } from "../events.js";
+import { docsIndex, relevantDocs } from "../docs-context.js";
+import { type AgentMessagePayload, WORKFLOW_ACTOR } from "../events.js";
 import type { ThreadService } from "../thread-service.js";
 import {
   DONE,
@@ -15,15 +16,19 @@ import { renderTemplate } from "./template.js";
 
 export type GateDecision = "approved" | "changes_requested";
 
+/** Where product docs live in a repo; the docs step may only change this directory. */
+export const DOCS_DIR = "docs";
+
 /** A request that isn't valid in the card's current state. Reported to the caller. */
 export class WorkflowError extends Error {}
 
-/** A named action workflows can run on step enter/exit (plugins register these, phase 6). */
+/** A named action workflows can run on step enter/exit; plugins provide them. */
 export type Hook = (ctx: {
   card: Card;
   step: StepDefinition;
   repo: Repo | null;
-  engine: WorkflowEngine;
+  board: Board;
+  runner: Runner;
 }) => Promise<Record<string, unknown> | undefined>;
 
 export interface WorkflowEngineOptions {
@@ -33,7 +38,12 @@ export interface WorkflowEngineOptions {
   workflows: Map<string, WorkflowDefinition>;
   /** Where card worktrees are created: <worktreesDir>/<card-key>. */
   worktreesDir: string;
+  /** Hooks available to every product (tests, built-ins). */
   hooks?: Record<string, Hook>;
+  /** Hooks from the card's product's plugins. */
+  resolveHook?: (card: Card, name: string) => Promise<Hook | null>;
+  /** Product instructions (plugins) prepended to each step's first prompt. */
+  instructionsFor?: (card: Card) => Promise<string>;
   /** Notified whenever a card changes (board live updates). */
   onCardChange?: (cardId: string) => void;
 }
@@ -79,7 +89,7 @@ export class WorkflowEngine {
   async decide(
     cardId: string,
     decision: GateDecision,
-    opts: { comment?: string; actor?: Actor } = {},
+    opts: { comment?: string; actor?: Actor; discardDocs?: boolean } = {},
   ): Promise<void> {
     const check = (card: Card) => {
       if (card.state !== "awaiting_gate" && card.state !== "blocked") {
@@ -94,8 +104,12 @@ export class WorkflowEngine {
         step: card.step,
         decision,
         comment: opts.comment ?? null,
+        ...(opts.discardDocs ? { discardDocs: true } : {}),
       });
-      await this.complete(card, decision, opts.comment ?? null);
+      await this.complete(card, decision, opts.comment ?? null, {
+        actor: opts.actor ?? "system",
+        discardDocs: opts.discardDocs ?? false,
+      });
     });
   }
 
@@ -157,7 +171,10 @@ export class WorkflowEngine {
         await this.options.runner.removeWorktree({
           repoPath: repo.path,
           worktreePath: card.worktreePath,
-          refPrefixes: threads.map((t) => `refs/factory/threads/${t.id}`),
+          refPrefixes: [
+            ...threads.map((t) => `refs/factory/threads/${t.id}`),
+            `refs/factory/cards/${card.id}`,
+          ],
         });
       }
       await this.options.board.updateCard(card.id, { state: "closed", worktreePath: null });
@@ -212,6 +229,16 @@ export class WorkflowEngine {
     await this.runHooks(card, step, repo, "enter");
 
     const cwd = await this.ensureWorktree(card, repo);
+    const proposesDocs = step.outputs.includes("doc_proposal") && repo != null;
+    // Doc proposals cover everything since the step was first entered (across re-entries).
+    const docsBase = proposesDocs
+      ? ((await board.pendingDocProposal(card.id, step.id))?.baseCheckpoint ??
+        (await this.options.runner.checkpoint(
+          cwd,
+          `refs/factory/cards/${card.id}/${step.id}-base`,
+          "docs base",
+        )))
+      : null;
     let thread = await board.stepThread(card.id, step.id);
     let message: string;
     if (!thread) {
@@ -222,18 +249,33 @@ export class WorkflowEngine {
         step: step.id,
       });
       message = await this.renderStepPrompt(card, step, repo, input);
+      const instructions = await this.options.instructionsFor?.(card);
+      if (instructions) message = `${message}\n\n## Product instructions\n${instructions}`;
     } else {
       message = input ?? "Continue with this step.";
     }
 
     const mode = step.mode;
-    await threads.send({ threadId: thread.id, agentId: step.agent, text: message, mode });
+    await threads.send({
+      actor: WORKFLOW_ACTOR,
+      threadId: thread.id,
+      agentId: step.agent,
+      text: message,
+      mode,
+    });
     if (step.consult.length) {
       const consult = renderTemplate(wf.shared.consult, { driver: step.agent });
       for (const agentId of step.consult) {
-        await threads.send({ threadId: thread.id, agentId, text: consult, mode: "consult" });
+        await threads.send({
+          actor: WORKFLOW_ACTOR,
+          threadId: thread.id,
+          agentId,
+          text: consult,
+          mode: "consult",
+        });
       }
       await threads.send({
+        actor: WORKFLOW_ACTOR,
         threadId: thread.id,
         agentId: step.agent,
         text: wf.shared.revise,
@@ -247,6 +289,7 @@ export class WorkflowEngine {
       step: step.id,
       format: content.format,
     });
+    if (docsBase) await this.proposeDocs(card, step, thread.id, cwd, docsBase);
 
     await this.gate(card, step, repo, cwd);
   }
@@ -304,8 +347,10 @@ export class WorkflowEngine {
     card: Card,
     decision: GateDecision,
     comment: string | null,
+    opts: { actor?: Actor; discardDocs?: boolean } = {},
   ): Promise<void> {
     const { board } = this.options;
+    card = await this.card(card.id); // callers may hold a copy from before the worktree existed
     const wf = this.workflow(card.type);
     if (!card.step) throw new Error(`${card.key} is not in a step`);
     const step = stepById(wf, card.step);
@@ -313,7 +358,11 @@ export class WorkflowEngine {
     const target =
       step.on[decision] ?? (decision === "approved" ? nextStepId(wf, step.id) : step.id);
 
-    if (decision === "approved") await this.runHooks(card, step, repo, "exit");
+    if (decision === "approved") {
+      await this.settleDocProposal(card, step, opts);
+      await this.commitStep(card, step);
+      await this.runHooks(card, step, repo, "exit");
+    }
     await board.addEvent(card.id, "step_completed", "system", {
       step: step.id,
       decision,
@@ -340,6 +389,82 @@ export class WorkflowEngine {
     await this.runStep(card, target, input);
   }
 
+  /** Turns the docs step's worktree changes into a proposal for a person to review. */
+  private async proposeDocs(
+    card: Card,
+    step: StepDefinition,
+    threadId: string,
+    cwd: string,
+    base: string,
+  ) {
+    const { board, runner } = this.options;
+    const head = await runner.checkpoint(
+      cwd,
+      `refs/factory/cards/${card.id}/${step.id}-head`,
+      "docs head",
+    );
+    if (!head) return;
+    const all = await runner.diff(cwd, base, head);
+    const inDocs = all.files.filter(
+      (f) => f.path === DOCS_DIR || f.path.startsWith(`${DOCS_DIR}/`),
+    );
+    const outsideDocs = all.files.filter((f) => !inDocs.includes(f)).map((f) => f.path);
+    const { patch } = await runner.patch(cwd, base, head, [DOCS_DIR]);
+    const proposal = await board.saveDocProposal({
+      cardId: card.id,
+      step: step.id,
+      threadId,
+      baseCheckpoint: base,
+      headCheckpoint: head,
+      patch,
+      files: inDocs,
+      outsideDocs,
+    });
+    await board.addEvent(card.id, "docs_proposed", `agent:${step.agent}`, {
+      step: step.id,
+      proposal: proposal.id,
+      files: inDocs.length,
+      outsideDocs: outsideDocs.length,
+    });
+  }
+
+  /** On approval: accept the pending doc proposal, or revert it if the reviewer discarded it. */
+  private async settleDocProposal(
+    card: Card,
+    step: StepDefinition,
+    opts: { actor?: Actor; discardDocs?: boolean },
+  ) {
+    const { board, runner } = this.options;
+    const pending = await board.pendingDocProposal(card.id, step.id);
+    if (!pending) return;
+    if (opts.discardDocs && card.worktreePath) {
+      await runner.restorePaths(card.worktreePath, pending.baseCheckpoint, [DOCS_DIR]);
+      await board.reviewDocProposal(pending.id, "discarded", opts.actor ?? "system");
+      await board.addEvent(card.id, "docs_discarded", opts.actor ?? "system", {
+        step: step.id,
+        proposal: pending.id,
+      });
+    } else {
+      await board.reviewDocProposal(pending.id, "approved", opts.actor ?? "system");
+      await board.addEvent(card.id, "docs_approved", opts.actor ?? "system", {
+        step: step.id,
+        proposal: pending.id,
+      });
+    }
+  }
+
+  /** Commits what an approved write step changed, so the branch tells the story step by step. */
+  private async commitStep(card: Card, step: StepDefinition) {
+    if (step.mode !== "write" || !card.worktreePath || !card.repoId) return;
+    const handover = await this.options.board.latestHandover(card.id, { step: step.id });
+    const goal = handover?.content.format === "structured" ? handover.content.handover.goal : "";
+    const subject = `${card.key} ${step.name}: ${goal || card.title}`.replace(/\s+/g, " ");
+    const message = `${subject.length > 72 ? `${subject.slice(0, 71)}…` : subject}\n\nCard: ${card.key} — ${card.title}\nStep: ${step.name}`;
+    const commit = await this.options.runner.commitAll(card.worktreePath, message);
+    if (commit)
+      await this.options.board.addEvent(card.id, "committed", "system", { step: step.id, commit });
+  }
+
   private async collectHandover(
     threadId: string,
     step: StepDefinition,
@@ -347,7 +472,13 @@ export class WorkflowEngine {
   ): Promise<HandoverContent> {
     const { threads } = this.options;
     const ask = async (text: string) => {
-      const reply = await threads.send({ threadId, agentId: step.agent, text, mode: "consult" });
+      const reply = await threads.send({
+        actor: WORKFLOW_ACTOR,
+        threadId,
+        agentId: step.agent,
+        text,
+        mode: "consult",
+      });
       return (reply.payload as AgentMessagePayload).text;
     };
     const first = await ask(
@@ -371,7 +502,17 @@ export class WorkflowEngine {
   ) {
     const { board } = this.options;
     const previous = await board.latestHandover(card.id, { excludeStep: step.id });
+    const docs = card.worktreePath
+      ? await this.options.runner.readDocs(card.worktreePath, DOCS_DIR)
+      : [];
+    const previousGoal =
+      previous?.content.format === "structured" ? previous.content.handover.goal : "";
     return renderTemplate(step.promptTemplate, {
+      docs: {
+        dir: DOCS_DIR,
+        index: docsIndex(docs),
+        relevant: relevantDocs(docs, `${card.title}\n${card.body}\n${previousGoal}`),
+      },
       card: { key: card.key, title: card.title, body: card.body, type: card.type },
       step: { id: step.id, name: step.name },
       repo: repo
@@ -425,15 +566,22 @@ export class WorkflowEngine {
     phase: "enter" | "exit",
   ) {
     for (const name of step.hooks[phase]) {
-      const hook = this.options.hooks?.[name];
+      const hook =
+        this.options.hooks?.[name] ?? (await this.options.resolveHook?.(card, name)) ?? null;
       if (!hook) {
         await this.options.board.addEvent(card.id, "hook_skipped", "system", {
           hook: name,
-          reason: "no plugin provides this hook",
+          reason: "no enabled plugin provides this hook",
         });
         continue;
       }
-      const result = await hook({ card, step, repo, engine: this });
+      const result = await hook({
+        card,
+        step,
+        repo,
+        board: this.options.board,
+        runner: this.options.runner,
+      });
       await this.options.board.addEvent(card.id, "hook_ran", "system", {
         hook: name,
         phase,
