@@ -161,3 +161,37 @@ export async function restorePaths(cwd: string, source: string, paths: string[])
   // `git checkout <commit> -- file` also stages it; unstage to leave the index as it was.
   await git(cwd, ["reset", "-q", "--", ...paths]).catch(() => undefined);
 }
+
+export interface PushAuth {
+  username: string;
+  password: string;
+}
+
+/**
+ * Pushes `branch` to `remote` (a URL or path). Credentials go in an HTTP header for this
+ * one command only, so tokens never land in the repo's config or remote URLs.
+ */
+export async function pushBranch(
+  cwd: string,
+  remote: string,
+  branch: string,
+  auth?: PushAuth,
+): Promise<void> {
+  const extra = auth
+    ? [
+        "-c",
+        `http.extraHeader=Authorization: Basic ${Buffer.from(`${auth.username}:${auth.password}`).toString("base64")}`,
+      ]
+    : [];
+  await git(cwd, [
+    ...extra,
+    "push",
+    "--porcelain",
+    remote,
+    `refs/heads/${branch}:refs/heads/${branch}`,
+  ]);
+}
+
+export async function remoteUrl(cwd: string, name = "origin"): Promise<string | null> {
+  return git(cwd, ["remote", "get-url", name]).catch(() => null);
+}

@@ -111,12 +111,35 @@ export interface DocProposalDto {
   createdAt: string;
 }
 
+export interface LinkDto {
+  id: string;
+  plugin: string;
+  kind: string;
+  ref: string;
+  url: string;
+  title: string | null;
+}
+
+export interface PluginDto {
+  id: string;
+  name: string;
+  description: string;
+  exampleConfig: Record<string, unknown>;
+}
+
+export interface PluginConfigDto {
+  plugin: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+}
+
 export interface CardDetailDto {
   card: CardDto;
   events: CardEventDto[];
   handovers: HandoverDto[];
   threads: ThreadSummaryDto[];
   docProposals: DocProposalDto[];
+  links: LinkDto[];
 }
 
 export interface FileChangeDto {

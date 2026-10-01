@@ -1,4 +1,4 @@
-import type { SessionUpdate } from "@agentclientprotocol/sdk";
+import type { McpServer, SessionUpdate } from "@agentclientprotocol/sdk";
 import { type Db, schema } from "@factory/db";
 import type { Runner } from "@factory/runner";
 import { and, asc, eq, gt, inArray, max } from "drizzle-orm";
@@ -39,6 +39,8 @@ export interface ThreadServiceOptions {
   turnTimeoutMs?: number;
   /** Display names for agents/users in context preambles. */
   names?: Record<string, string>;
+  /** Tools (MCP servers) the agents in a thread get, e.g. from the product's plugins. */
+  mcpServersFor?: (thread: Thread) => Promise<McpServer[]>;
   /** Supplies the latest handover for a thread when an agent must be rehydrated (phase 3). */
   handoverFor?: (threadId: string) => Promise<string | null>;
 }
@@ -174,6 +176,7 @@ export class ThreadService {
         cwd: thread.cwd,
         mode: toSessionMode(mode),
         existingSessionId: session?.acpSessionId,
+        mcpServers: (await this.options.mcpServersFor?.(thread)) ?? [],
       });
 
       // Continuing its own session → delta since its cursor. Fresh session → recap.

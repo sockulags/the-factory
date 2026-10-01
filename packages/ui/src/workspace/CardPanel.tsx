@@ -99,6 +99,15 @@ export function CardPanel({
           {card.busy && card.state !== "running" ? "Working" : STATE_LABEL[card.state]}
         </span>
         {card.branch && <code className="small">{card.branch}</code>}
+        {d.links.map((l) => (
+          <a key={l.id} className="link-chip small" href={l.url} target="_blank" rel="noreferrer">
+            {l.kind === "pull_request"
+              ? `PR #${l.ref}`
+              : l.kind === "merge_request"
+                ? `MR !${l.ref}`
+                : `${l.kind} ${l.ref}`}
+          </a>
+        ))}
         {card.state === "backlog" && (
           <button type="button" onClick={() => void act(() => ctx.api.start(card.id))}>
             Start

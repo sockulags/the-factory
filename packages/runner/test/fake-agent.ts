@@ -112,7 +112,9 @@ const connection = new AgentSideConnection(
         let reply = "I don't know how to do that.";
         const word = text.match(/exactly the word (\w+)/);
         const plant = text.match(/codeword for later: (\S+?)\./);
-        const create = text.match(/Create a file named (\S+) .*containing exactly the text: (.*)$/);
+        const create = text.match(
+          /Create a file named (\S+) .*containing exactly the text: (.*)$/m,
+        );
         const count = text.match(/Count from 1 to (\d+)/);
 
         const echo = text.match(/^Say: ([\s\S]+)$/);

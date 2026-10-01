@@ -20,6 +20,8 @@ services:
   server:
     image: ${FACTORY_SERVER_IMAGE:-ghcr.io/sockulags/the-factory-server:latest}
     restart: unless-stopped
+    # Plugin secrets (GITHUB_TOKEN, GITLAB_TOKEN, …) are read from the environment.
+    env_file: .env
     depends_on:
       postgres:
         condition: service_healthy

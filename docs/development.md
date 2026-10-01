@@ -163,6 +163,9 @@ device-code login option.
 Put the repos the team works on under `REPOS_DIR` (mounted at `/repos`), and register
 them in the app under **Products & repos** with paths like `/repos/web`.
 
+Integrations (GitHub/GitLab PRs, Jira via MCP, …) are configured per product in the
+app. Their tokens go in `deploy/.env` (see [plugins.md](plugins.md)).
+
 ### Keycloak client
 
 Create (or import from `deploy/keycloak/factory-realm.json`) a client:

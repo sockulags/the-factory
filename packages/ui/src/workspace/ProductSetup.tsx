@@ -1,6 +1,7 @@
 import type { ProductDto } from "@factory/protocol";
 import { type FormEvent, useId, useState } from "react";
 import { errorMessage, useResource } from "../hooks.js";
+import { Integrations } from "./Integrations.js";
 import type { WorkspaceContext } from "./Workspace.js";
 
 /** Create products and register their repos (paths as seen by the runner). */
@@ -149,6 +150,16 @@ export function ProductSetup({
               Add repo
             </button>
           </form>
+        </section>
+      )}
+      {productId && (
+        <section>
+          <h3>Integrations</h3>
+          <p className="muted small">
+            Tokens are never stored here: configs name server environment variables (e.g.{" "}
+            <code>GITHUB_TOKEN</code>).
+          </p>
+          <Integrations ctx={ctx} productId={productId} />
         </section>
       )}
       {onCancel && (

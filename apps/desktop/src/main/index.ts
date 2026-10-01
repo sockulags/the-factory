@@ -42,7 +42,7 @@ async function main() {
   ipcMain.handle(BRIDGE_CHANNELS.installUpdate, () => controller.installUpdate());
   ipcMain.handle(BRIDGE_CHANNELS.api, (_e, apiPath: string) => controller.api(String(apiPath)));
   ipcMain.handle(BRIDGE_CHANNELS.request, (_e, method: string, apiPath: string, body?: unknown) => {
-    if (!["GET", "POST", "PATCH", "DELETE"].includes(method)) throw new Error("bad method");
+    if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(method)) throw new Error("bad method");
     return controller.request(method, String(apiPath), body);
   });
   const streams = new Map<string, () => void>();

@@ -1,7 +1,9 @@
 import path from "node:path";
 import {
   Board,
+  builtinPlugins,
   loadWorkflows,
+  PluginHost,
   ThreadService,
   type WorkflowDefinition,
   WorkflowEngine,
@@ -30,6 +32,7 @@ export interface FactoryServices {
   workflows: Map<string, WorkflowDefinition>;
   agents: AgentSpec[];
   bus: ChangeBus;
+  plugins: PluginHost;
 }
 
 export async function createFactoryServices(opts: {
@@ -38,6 +41,8 @@ export async function createFactoryServices(opts: {
   /** Tests inject agents/runner; production loads them from config. */
   agents?: AgentSpec[];
   runner?: Runner;
+  /** Tests inject a plugin host (fake HTTP); production uses the built-ins. */
+  plugins?: PluginHost;
 }): Promise<FactoryServices> {
   const { db, config } = opts;
   const agents = opts.agents ?? (await loadAgents(config.AGENTS_CONFIG));
@@ -48,11 +53,16 @@ export async function createFactoryServices(opts: {
   );
   const bus = new ChangeBus();
   const board = new Board(db);
+  const plugins = opts.plugins ?? new PluginHost(db, builtinPlugins());
   const threads = new ThreadService({
     db,
     runner,
     turnTimeoutMs: config.TURN_TIMEOUT_MINUTES * 60_000,
     handoverFor: (id) => board.handoverForThread(id),
+    mcpServersFor: async (thread) => {
+      const card = thread.cardId ? await board.getCard(thread.cardId) : null;
+      return card ? plugins.mcpServersFor(card.productId) : [];
+    },
   });
   const engine = new WorkflowEngine({
     board,
@@ -60,7 +70,9 @@ export async function createFactoryServices(opts: {
     runner,
     workflows,
     worktreesDir: path.resolve(config.WORKTREES_DIR),
+    resolveHook: (card, name) => plugins.resolveHook(card, name),
+    instructionsFor: (card) => plugins.instructionsFor(card.productId),
     onCardChange: (id) => bus.cardChanged(id),
   });
-  return { board, threads, engine, runner, workflows, agents, bus };
+  return { board, threads, engine, runner, workflows, agents, bus, plugins };
 }

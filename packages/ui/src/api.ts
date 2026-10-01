@@ -4,6 +4,8 @@ import type {
   CardDto,
   DesktopBridge,
   GateDecision,
+  PluginConfigDto,
+  PluginDto,
   ProductDto,
   RepoDto,
   ThreadDetailDto,
@@ -26,6 +28,18 @@ export function createApi(bridge: DesktopBridge) {
       productId: string,
       repo: { name: string; path: string; defaultBranch: string; checks: string[] },
     ) => post<RepoDto>(`/products/${productId}/repos`, repo),
+    plugins: () => get<PluginDto[]>("/plugins"),
+    pluginConfigs: (productId: string) => get<PluginConfigDto[]>(`/products/${productId}/plugins`),
+    configurePlugin: (
+      productId: string,
+      plugin: string,
+      enabled: boolean,
+      config: Record<string, unknown>,
+    ) =>
+      bridge.request<PluginConfigDto>("PUT", `/products/${productId}/plugins/${plugin}`, {
+        enabled,
+        config,
+      }),
     cards: (productId: string) => get<CardDto[]>(`/products/${productId}/cards`),
     createCard: (productId: string, card: { type: string; title: string; body: string }) =>
       post<CardDto>(`/products/${productId}/cards`, card),

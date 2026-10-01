@@ -189,6 +189,45 @@ describe("factory API", () => {
     expect(done.threads.map((t) => t.step)).toEqual(["triage", "fix", "review"]);
   }, 90_000);
 
+  it("lists plugins and validates per-product config", async () => {
+    const plugins = (await call<{ id: string }[]>("GET", "/api/plugins")).json.map((p) => p.id);
+    expect(plugins).toEqual(["github", "gitlab", "mcp", "instructions", "webhook"]);
+    const [product] = (await call<ProductDto[]>("GET", "/api/products")).json;
+    const bad = await call<{ detail: string }>(
+      "PUT",
+      `/api/products/${product?.id}/plugins/github`,
+      {
+        enabled: true,
+        config: { owner: "acme" },
+      },
+    );
+    expect(bad.status).toBe(400);
+    expect(bad.json.detail).toContain("repo");
+    const ok = await call("PUT", `/api/products/${product?.id}/plugins/github`, {
+      enabled: true,
+      config: { owner: "acme", repo: "web" },
+    });
+    expect(ok.status).toBe(200);
+    const configs = (
+      await call<{ plugin: string; config: Record<string, unknown> }[]>(
+        "GET",
+        `/api/products/${product?.id}/plugins`,
+      )
+    ).json;
+    expect(configs[0]).toMatchObject({
+      plugin: "github",
+      config: { owner: "acme", repo: "web", tokenEnv: "GITHUB_TOKEN" },
+    });
+    // Card detail carries links (none yet).
+    const [card] = (await call<CardDto[]>("GET", `/api/products/${product?.id}/cards`)).json;
+    expect((await call<CardDetailDto>("GET", `/api/cards/${card?.id}`)).json.links).toEqual([]);
+    // Leave it disabled so later tests don't try to reach GitHub.
+    await call("PUT", `/api/products/${product?.id}/plugins/github`, {
+      enabled: false,
+      config: { owner: "acme", repo: "web" },
+    });
+  });
+
   it("streams thread events over SSE", async () => {
     const [product] = (await call<ProductDto[]>("GET", "/api/products")).json;
     const created = await call<CardDto>("POST", `/api/products/${product?.id}/cards`, {
