@@ -11,6 +11,7 @@ import {
   diffPatch,
   diffSummary,
   ensureWorktree,
+  inspectRepo,
   isGitRepo,
   type PushAuth,
   pushBranch,
@@ -57,6 +58,8 @@ export interface Runner {
   /** Snapshot of the worktree; null when `cwd` is not a git repo. */
   checkpoint(cwd: string, ref: string, message: string): Promise<string | null>;
   diff(cwd: string, from: string, to: string): Promise<DiffSummary>;
+  /** Validates a repo path; returns its root and default branch. Throws a readable error. */
+  inspectRepo(path: string): Promise<{ path: string; defaultBranch: string }>;
   /** Creates the card's worktree on `branch` from `base` if it doesn't exist yet. */
   ensureWorktree(req: {
     repoPath: string;
@@ -157,6 +160,10 @@ export class LocalRunner implements Runner {
 
   diff(cwd: string, from: string, to: string): Promise<DiffSummary> {
     return diffSummary(cwd, from, to);
+  }
+
+  inspectRepo(path: string): Promise<{ path: string; defaultBranch: string }> {
+    return inspectRepo(path);
   }
 
   ensureWorktree(req: {

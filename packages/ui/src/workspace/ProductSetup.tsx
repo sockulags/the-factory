@@ -19,7 +19,7 @@ export function ProductSetup({
   const [productId, setProductId] = useState<string>(products[0]?.id ?? "");
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
-  const [repo, setRepo] = useState({ name: "", path: "", defaultBranch: "main", checks: "" });
+  const [repo, setRepo] = useState({ name: "", path: "", defaultBranch: "", checks: "" });
   const [error, setError] = useState<string | null>(null);
   const repos = useResource(productId ? () => ctx.api.repos(productId) : null, productId);
   const ids = {
@@ -48,15 +48,18 @@ export function ProductSetup({
     e.preventDefault();
     try {
       await ctx.api.addRepo(productId, {
-        name: repo.name || repo.path.split(/[\\/]/).filter(Boolean).pop() || "repo",
+        name:
+          repo.name ||
+          repo.path.replace(/["']/g, "").split(/[\\/]/).filter(Boolean).pop() ||
+          "repo",
         path: repo.path,
-        defaultBranch: repo.defaultBranch,
+        defaultBranch: repo.defaultBranch.trim() || undefined,
         checks: repo.checks
           .split("\n")
           .map((c) => c.trim())
           .filter(Boolean),
       });
-      setRepo({ name: "", path: "", defaultBranch: "main", checks: "" });
+      setRepo({ name: "", path: "", defaultBranch: "", checks: "" });
       setError(null);
       await repos.reload();
     } catch (err) {
@@ -136,6 +139,7 @@ export function ProductSetup({
               id={ids.rbranch}
               value={repo.defaultBranch}
               onChange={(e) => setRepo({ ...repo, defaultBranch: e.target.value })}
+              placeholder="detected from the repo"
             />
             <label htmlFor={ids.rchecks}>Checks (one per line)</label>
             <textarea

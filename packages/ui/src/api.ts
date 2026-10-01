@@ -27,7 +27,7 @@ export function createApi(bridge: DesktopBridge) {
     repos: (productId: string) => get<RepoDto[]>(`/products/${productId}/repos`),
     addRepo: (
       productId: string,
-      repo: { name: string; path: string; defaultBranch: string; checks: string[] },
+      repo: { name: string; path: string; defaultBranch?: string; checks: string[] },
     ) => post<RepoDto>(`/products/${productId}/repos`, repo),
     plugins: () => get<PluginDto[]>("/plugins"),
     pluginConfigs: (productId: string) => get<PluginConfigDto[]>(`/products/${productId}/plugins`),

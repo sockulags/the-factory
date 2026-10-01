@@ -5,7 +5,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { checkpoint, commitAll, diffPatch, restorePaths } from "../src/git.js";
+import {
+  checkpoint,
+  commitAll,
+  diffPatch,
+  ensureWorktree,
+  inspectRepo,
+  restorePaths,
+} from "../src/git.js";
 
 const exec = promisify(execFile);
 const git = async (cwd: string, ...args: string[]) =>
@@ -53,5 +60,22 @@ describe("git helpers", () => {
     const commit = await commitAll(dir, "WEB-1 Fix: it works");
     expect(commit).toMatch(/^[0-9a-f]{40}$/);
     expect(await git(dir, "log", "-1", "--format=%an %s")).toBe("The Factory WEB-1 Fix: it works");
+  });
+
+  it("inspects a repo: root and branch from a pasted, quoted subfolder path", async () => {
+    const dir = await repo();
+    await git(dir, "checkout", "-qb", "trunk");
+    const found = await inspectRepo(`"${path.join(dir, "docs")}"`);
+    expect(found.path).toBe(path.resolve(await git(dir, "rev-parse", "--show-toplevel")));
+    expect(found.defaultBranch).toBe("trunk");
+  });
+
+  it("explains a wrong repo path instead of 'spawn git ENOENT'", async () => {
+    const missing = path.join(tmpdir(), "no-such-repo-xyz");
+    await expect(inspectRepo(missing)).rejects.toThrow(`folder not found: ${missing}`);
+    await expect(inspectRepo(tmpdir())).rejects.toThrow("not a git repository");
+    await expect(ensureWorktree(missing, path.join(missing, "wt"), "b", "main")).rejects.toThrow(
+      `folder not found: ${missing}`,
+    );
   });
 });

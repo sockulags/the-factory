@@ -162,12 +162,22 @@ export function factoryRoutes(f: FactoryServices, opts: { adminRole: string }) {
       .object({
         name: z.string().min(1),
         path: z.string().min(1),
-        defaultBranch: z.string().min(1).default("main"),
+        defaultBranch: z.string().trim().optional(),
         checks: z.array(z.string().min(1)).default([]),
       })
       .parse(await c.req.json());
     if (!(await f.board.getProduct(c.req.param("id")))) throw new NotFound("product");
-    return c.json(repoDto(await f.board.addRepo({ productId: c.req.param("id"), ...body })), 201);
+    // Catch a wrong path now rather than when the first card starts.
+    const found = await f.runner.inspectRepo(body.path).catch((err: Error) => {
+      throw new BadRequest(err.message);
+    });
+    const repo = await f.board.addRepo({
+      productId: c.req.param("id"),
+      ...body,
+      path: found.path,
+      defaultBranch: body.defaultBranch || found.defaultBranch,
+    });
+    return c.json(repoDto(repo), 201);
   });
 
   // ── Plugins ────────────────────────────────────────────────────

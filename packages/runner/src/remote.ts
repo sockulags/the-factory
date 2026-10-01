@@ -20,6 +20,7 @@ const METHODS = [
   "cancel",
   "checkpoint",
   "diff",
+  "inspectRepo",
   "ensureWorktree",
   "removeWorktree",
   "exec",
@@ -120,6 +121,7 @@ export class RemoteRunner implements Runner {
   checkpoint: Runner["checkpoint"] = (cwd, ref, message) =>
     this.call("checkpoint", [cwd, ref, message]);
   diff: Runner["diff"] = (cwd, from, to) => this.call("diff", [cwd, from, to]);
+  inspectRepo: Runner["inspectRepo"] = (path) => this.call("inspectRepo", [path]);
   ensureWorktree: Runner["ensureWorktree"] = (req) => this.call("ensureWorktree", [req]);
   removeWorktree: Runner["removeWorktree"] = (req) => this.call("removeWorktree", [req]);
   exec: Runner["exec"] = (command, cwd, timeoutMs) => this.call("exec", [command, cwd, timeoutMs]);
