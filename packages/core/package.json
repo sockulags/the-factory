@@ -8,6 +8,7 @@
   },
   "scripts": {
     "thread": "tsx src/cli/thread.ts",
+    "factory": "tsx src/cli/factory.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -15,7 +16,9 @@
     "@agentclientprotocol/sdk": "^1.5.1",
     "@factory/db": "workspace:*",
     "@factory/runner": "workspace:*",
-    "drizzle-orm": "^0.45.3"
+    "drizzle-orm": "^0.45.3",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "tsx": "^4.20.6"

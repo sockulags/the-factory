@@ -15,6 +15,13 @@
       "when": 1790805488660,
       "tag": "0001_threads",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790805933727,
+      "tag": "0002_cards_workflows",
+      "breakpoints": true
     }
   ]
 }

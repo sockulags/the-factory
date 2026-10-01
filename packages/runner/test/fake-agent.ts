@@ -117,7 +117,26 @@ const connection = new AgentSideConnection(
 
         const echo = text.match(/^Say: ([\s\S]+)$/);
 
-        if (echo) reply = echo[1] ?? "";
+        const wantsHandover = text.includes("Write the step handover");
+        const checksFailed = /The checks failed/.test(text) && env.FAKE_ON_CHECKS_FAILED;
+
+        if (wantsHandover) {
+          const good = env.FAKE_BAD_HANDOVER !== "always";
+          reply = good
+            ? `Here you go:\n\n\`\`\`json\n${JSON.stringify({
+                goal: `Handled: ${s.history[0]?.text.split("\n")[0]?.slice(0, 80) ?? "step"}`,
+                decisions: [{ decision: "Kept it simple", why: "Fake agent" }],
+                rejected: [],
+                filesTouched: [],
+                verify: ["Look at the thread"],
+                openQuestions: [],
+              })}\n\`\`\``
+            : "I'd rather not write JSON.";
+        } else if (checksFailed) {
+          const target = path.join(s.cwd, env.FAKE_ON_CHECKS_FAILED ?? "fixed.txt");
+          await conn.writeTextFile({ sessionId, path: target, content: "ok\n" });
+          reply = `Fixed by creating ${env.FAKE_ON_CHECKS_FAILED}.`;
+        } else if (echo) reply = echo[1] ?? "";
         else if (word) reply = word[1] ?? "";
         else if (plant) {
           s.memory.codeword = plant[1] ?? "";

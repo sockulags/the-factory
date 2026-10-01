@@ -1,0 +1,23 @@
+type: lite
+steps:
+  triage:
+    agent: alpha
+    mode: read-only
+    prompt: prompts/triage.md
+    gate: human
+  fix:
+    agent: alpha
+    mode: write
+    prompt: prompts/fix.md
+    gate: checks
+    maxCheckAttempts: 2
+  review:
+    agent: beta
+    mode: consult
+    consult: [alpha]
+    prompt: prompts/review.md
+    gate: human
+    on:
+      changes_requested: fix
+    hooks:
+      exit: [test.hook, missing.hook]

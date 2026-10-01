@@ -1,54 +1,49 @@
-# DRAFT — illustrative, schema not final.
-# One thread per step. One worktree per card, shared by all steps.
-# Steps without `on:` advance to the next step when their gate passes.
+# Feature: spec → design (with critique from other models) → plan → implement → review → docs.
 type: feature
-columns: [backlog, spec, design, plan, implement, review, docs, done]
+name: Feature
+description: New capability. Agree what and how before building it.
 
 steps:
   spec:
     agent: claude
-    mode: read-only
-    prompt: ./prompts/spec.md
+    mode: consult
+    prompt: prompts/spec.md
     gate: human
-    outputs: [handover]
 
   design:
     agent: claude
-    mode: read-only
-    consult: [codex, gemini]   # auto-asks for critique in the same thread
-    prompt: ./prompts/design.md
+    mode: consult
+    consult: [codex]           # other providers critique the design in the same thread
+    prompt: prompts/design.md
     gate: human
-    outputs: [handover]        # includes decision record: chosen / rejected / why
 
   plan:
     agent: codex
-    mode: read-only
-    prompt: ./prompts/plan.md
+    mode: consult
+    prompt: prompts/plan.md
     gate: auto
-    outputs: [handover]
 
   implement:
     agent: claude
     mode: write
-    prompt: ./prompts/implement.md
+    prompt: prompts/implement.md
     gate: checks
-    outputs: [handover]
+    maxCheckAttempts: 3
 
   review:
     agent: codex
-    mode: read-only
-    prompt: ./prompts/review.md
+    mode: consult
+    prompt: ../bug/prompts/review.md
     gate: human
-    outputs: [handover]
     on:
       approved: docs
-      changes_requested: implement   # re-enters and CONTINUES the implement thread
+      changes_requested: implement   # continues the implement thread with the findings
 
   docs:
     agent: claude
-    mode: read-only
-    prompt: ../_shared/docs-steward.md
+    mode: write
+    prompt: ../_shared/docs.md
     gate: human
-    outputs: [doc_proposal]        # approved diff is committed to the card branch
+    outputs: [doc_proposal]
     hooks:
-      exit: [vcs.open_pr]            # provided by the github/gitlab plugin
+      exit: [vcs.open_pr]

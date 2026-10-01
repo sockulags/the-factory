@@ -1,46 +1,44 @@
-# DRAFT — illustrative, schema not final.
-# One thread per step. One worktree per card, shared by all steps.
-# Steps without `on:` advance to the next step when their gate passes.
+# Bug: triage → reproduce → fix → review → docs.
+# One thread per step, one worktree per card. Steps advance when their gate passes;
+# `on:` overrides where a decision leads.
 type: bug
-columns: [backlog, triage, reproduce, fix, review, docs, done]
+name: Bug
+description: Something is broken. Understand it, prove it, fix it, review it.
 
 steps:
   triage:
     agent: claude
-    mode: read-only
-    prompt: ./prompts/triage.md
-    gate: human            # human confirms severity/scope before work starts
-    outputs: [handover]
+    mode: consult          # read-only: investigate, don't change anything yet
+    prompt: prompts/triage.md
+    gate: human            # a person confirms scope before work starts
 
   reproduce:
     agent: codex
-    mode: write            # may add a failing test
-    prompt: ./prompts/reproduce.md
-    gate: checks           # the new test must fail for the right reason
-    outputs: [handover]
+    mode: write            # adds a failing test
+    prompt: prompts/reproduce.md
+    gate: human
 
   fix:
     agent: claude
     mode: write
-    prompt: ./prompts/fix.md
-    gate: checks           # tests + lint green
-    outputs: [handover]
+    prompt: prompts/fix.md
+    gate: checks           # the repo's checks must pass; failures go back into this thread
+    maxCheckAttempts: 3
 
   review:
     agent: codex           # a different provider than the one that wrote the fix
-    mode: read-only
-    prompt: ./prompts/review.md
+    mode: consult
+    prompt: prompts/review.md
     gate: human
-    outputs: [handover]
     on:
       approved: docs
-      changes_requested: fix         # re-enters and CONTINUES the fix thread
+      changes_requested: fix   # continues the fix thread with the review findings
 
   docs:
     agent: claude
-    mode: read-only
-    prompt: ../_shared/docs-steward.md
-    gate: human            # human approves the doc diff
-    outputs: [doc_proposal]        # approved diff is committed to the card branch
+    mode: write
+    prompt: ../_shared/docs.md
+    gate: human
+    outputs: [doc_proposal]
     hooks:
-      exit: [vcs.open_pr]            # provided by the github/gitlab plugin
+      exit: [vcs.open_pr]      # provided by the GitHub/GitLab plugin (phase 6)

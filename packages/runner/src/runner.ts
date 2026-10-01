@@ -1,7 +1,16 @@
 import type { SessionUpdate } from "@agentclientprotocol/sdk";
 import { AgentProcess, type TurnResult } from "./agent-process.js";
 import type { AgentSpec } from "./agents.js";
-import { checkpoint, type DiffSummary, diffSummary, isGitRepo } from "./git.js";
+import { type ExecResult, runCommand } from "./exec.js";
+import {
+  checkpoint,
+  type DiffSummary,
+  deleteRefs,
+  diffSummary,
+  ensureWorktree,
+  isGitRepo,
+  removeWorktree,
+} from "./git.js";
 import type { SessionMode } from "./policy.js";
 
 /**
@@ -39,6 +48,20 @@ export interface Runner {
   /** Snapshot of the worktree; null when `cwd` is not a git repo. */
   checkpoint(cwd: string, ref: string, message: string): Promise<string | null>;
   diff(cwd: string, from: string, to: string): Promise<DiffSummary>;
+  /** Creates the card's worktree on `branch` from `base` if it doesn't exist yet. */
+  ensureWorktree(req: {
+    repoPath: string;
+    worktreePath: string;
+    branch: string;
+    base: string;
+  }): Promise<void>;
+  /** Removes the worktree and the Factory's hidden refs under each of `refPrefixes`. */
+  removeWorktree(req: {
+    repoPath: string;
+    worktreePath: string;
+    refPrefixes?: string[];
+  }): Promise<void>;
+  exec(command: string, cwd: string, timeoutMs?: number): Promise<ExecResult>;
   shutdown(): Promise<void>;
 }
 
@@ -105,6 +128,28 @@ export class LocalRunner implements Runner {
 
   diff(cwd: string, from: string, to: string): Promise<DiffSummary> {
     return diffSummary(cwd, from, to);
+  }
+
+  ensureWorktree(req: {
+    repoPath: string;
+    worktreePath: string;
+    branch: string;
+    base: string;
+  }): Promise<void> {
+    return ensureWorktree(req.repoPath, req.worktreePath, req.branch, req.base);
+  }
+
+  async removeWorktree(req: {
+    repoPath: string;
+    worktreePath: string;
+    refPrefixes?: string[];
+  }): Promise<void> {
+    await removeWorktree(req.repoPath, req.worktreePath);
+    for (const prefix of req.refPrefixes ?? []) await deleteRefs(req.repoPath, prefix);
+  }
+
+  exec(command: string, cwd: string, timeoutMs?: number): Promise<ExecResult> {
+    return runCommand(command, cwd, timeoutMs);
   }
 
   async shutdown(): Promise<void> {
