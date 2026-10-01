@@ -1,15 +1,19 @@
 import type { SessionUpdate } from "@agentclientprotocol/sdk";
 import { AgentProcess, type TurnResult } from "./agent-process.js";
 import type { AgentSpec } from "./agents.js";
+import { type DocFile, readDocs } from "./docs.js";
 import { type ExecResult, runCommand } from "./exec.js";
 import {
   checkpoint,
+  commitAll,
   type DiffSummary,
   deleteRefs,
+  diffPatch,
   diffSummary,
   ensureWorktree,
   isGitRepo,
   removeWorktree,
+  restorePaths,
 } from "./git.js";
 import type { SessionMode } from "./policy.js";
 
@@ -62,6 +66,17 @@ export interface Runner {
     refPrefixes?: string[];
   }): Promise<void>;
   exec(command: string, cwd: string, timeoutMs?: number): Promise<ExecResult>;
+  /** Commits all changes in the worktree; null if there was nothing to commit. */
+  commitAll(cwd: string, message: string): Promise<string | null>;
+  patch(
+    cwd: string,
+    from: string,
+    to: string,
+    paths?: string[],
+  ): Promise<{ patch: string; truncated: boolean }>;
+  /** Restores `paths` to their state in snapshot `source` (removes files added since). */
+  restorePaths(cwd: string, source: string, paths: string[]): Promise<void>;
+  readDocs(cwd: string, dir?: string): Promise<DocFile[]>;
   shutdown(): Promise<void>;
 }
 
@@ -150,6 +165,22 @@ export class LocalRunner implements Runner {
 
   exec(command: string, cwd: string, timeoutMs?: number): Promise<ExecResult> {
     return runCommand(command, cwd, timeoutMs);
+  }
+
+  commitAll(cwd: string, message: string): Promise<string | null> {
+    return commitAll(cwd, message);
+  }
+
+  patch(cwd: string, from: string, to: string, paths?: string[]) {
+    return diffPatch(cwd, from, to, paths);
+  }
+
+  restorePaths(cwd: string, source: string, paths: string[]): Promise<void> {
+    return restorePaths(cwd, source, paths);
+  }
+
+  readDocs(cwd: string, dir?: string): Promise<DocFile[]> {
+    return readDocs(cwd, dir);
   }
 
   async shutdown(): Promise<void> {

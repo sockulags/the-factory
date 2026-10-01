@@ -612,3 +612,26 @@ ul.plain {
 .with-panel .column {
   flex-basis: 210px;
 }
+.warning {
+  color: var(--warn);
+}
+.diff {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 12px;
+  overflow: auto;
+}
+.diff .add {
+  color: var(--ok);
+}
+.diff .del {
+  color: var(--error);
+}
+.diff .hunk {
+  color: var(--accent);
+}
+.diff .meta {
+  color: var(--muted);
+}

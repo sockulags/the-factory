@@ -33,8 +33,12 @@ export function createApi(bridge: DesktopBridge) {
     updateCard: (id: string, patch: { title?: string; body?: string; rank?: string }) =>
       bridge.request<CardDto>("PATCH", `/cards/${id}`, patch),
     start: (id: string) => post(`/cards/${id}/start`),
-    decide: (id: string, decision: GateDecision, comment?: string) =>
-      post(`/cards/${id}/decide`, { decision, comment }),
+    decide: (
+      id: string,
+      decision: GateDecision,
+      comment?: string,
+      opts: { discardDocs?: boolean } = {},
+    ) => post(`/cards/${id}/decide`, { decision, comment, ...opts }),
     retry: (id: string) => post(`/cards/${id}/retry`),
     move: (id: string, step: string) => post(`/cards/${id}/move`, { step }),
     close: (id: string) => post(`/cards/${id}/close`),

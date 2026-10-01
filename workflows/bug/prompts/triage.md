@@ -4,6 +4,12 @@ You are triaging a bug report. Investigate the code; do not change anything.
 
 {{card.body}}
 
+{{#if docs.relevant}}
+Relevant product documentation (may be out of date — the code is the truth):
+
+{{docs.relevant}}
+{{/if}}
+
 Work out:
 1. What the expected and actual behavior are, in one sentence each.
 2. Where in the code the problem most likely is (files and functions), and why you think so.

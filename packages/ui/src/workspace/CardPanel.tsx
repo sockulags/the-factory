@@ -1,12 +1,14 @@
 import type { CardDetailDto, HandoverDto } from "@factory/protocol";
 import { useEffect, useState } from "react";
 import { errorMessage, useResource } from "../hooks.js";
+import { DocProposalView } from "./DocProposalView.js";
 import { STATE_LABEL, timeAgo } from "./format.js";
 import { ThreadView } from "./ThreadView.js";
 import type { WorkspaceContext } from "./Workspace.js";
 
 type Tab =
   | { kind: "thread"; id: string }
+  | { kind: "docs" }
   | { kind: "handovers" }
   | { kind: "history" }
   | { kind: "details" };
@@ -59,6 +61,7 @@ export function CardPanel({
     }
   };
   const lastError = [...d.events].reverse().find((e) => e.kind === "error" || e.kind === "blocked");
+  const pendingDocs = d.docProposals.find((p) => p.status === "pending" && p.step === card.step);
 
   return (
     <aside className="panel" aria-label={`Card ${card.key}`}>
@@ -68,7 +71,7 @@ export function CardPanel({
           <span className="muted">· {workflow?.name ?? card.type}</span>
           <h2>{card.title}</h2>
         </div>
-        <button type="button" className="ghost" aria-label="Close card" onClick={onClose}>
+        <button type="button" className="ghost" aria-label="Close panel" onClick={onClose}>
           ✕
         </button>
       </header>
@@ -139,13 +142,29 @@ export function CardPanel({
               >
                 Request changes
               </button>
+              {pendingDocs && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() =>
+                    void act(() =>
+                      ctx.api.decide(card.id, "approved", comment || undefined, {
+                        discardDocs: true,
+                      }),
+                    )
+                  }
+                >
+                  Discard doc changes
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() =>
                   void act(() => ctx.api.decide(card.id, "approved", comment || undefined))
                 }
               >
-                Approve
+                {pendingDocs ? "Approve & commit docs" : "Approve"}
               </button>
             </div>
           </div>
@@ -175,7 +194,10 @@ export function CardPanel({
             {workflow?.steps.find((s) => s.id === t.step)?.name ?? t.title}
           </button>
         ))}
-        {(["handovers", "history", "details"] as const).map((k) => (
+        {(d.docProposals.length
+          ? (["docs", "handovers", "history", "details"] as const)
+          : (["handovers", "history", "details"] as const)
+        ).map((k) => (
           <button
             type="button"
             role="tab"
@@ -184,11 +206,13 @@ export function CardPanel({
             className={activeTab.kind === k ? "tab active" : "tab"}
             onClick={() => setTab({ kind: k })}
           >
-            {k === "handovers"
-              ? `Handovers (${d.handovers.length})`
-              : k === "history"
-                ? "History"
-                : "Details"}
+            {k === "docs"
+              ? `Doc changes${pendingDocs ? " •" : ""}`
+              : k === "handovers"
+                ? `Handovers (${d.handovers.length})`
+                : k === "history"
+                  ? "History"
+                  : "Details"}
           </button>
         ))}
       </div>
@@ -197,6 +221,7 @@ export function CardPanel({
         {activeTab.kind === "thread" && (
           <ThreadView key={activeTab.id} ctx={ctx} threadId={activeTab.id} card={card} />
         )}
+        {activeTab.kind === "docs" && <DocProposalView proposals={d.docProposals} />}
         {activeTab.kind === "handovers" && <Handovers handovers={d.handovers} />}
         {activeTab.kind === "history" && <History detail={d} />}
         {activeTab.kind === "details" && (

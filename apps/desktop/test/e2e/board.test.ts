@@ -31,6 +31,7 @@ describe("board (e2e)", () => {
 
       // New card → backlog → start.
       await page.getByRole("button", { name: "New card" }).click();
+      await page.getByLabel("Type").selectOption("lite");
       await page.getByLabel("Title").fill("Save button is greyed out");
       await page.getByLabel("Description").fill("Happens after editing a draft.");
       await page.getByRole("button", { name: "Create in backlog" }).click();
@@ -82,6 +83,29 @@ describe("board (e2e)", () => {
         .poll(() => page.locator('[data-column="done"] .card').count(), { timeout: 30_000 })
         .toBe(1);
       await shots("board-done");
+
+      // A card whose workflow ends in a docs step: review the proposed doc diff.
+      await page.getByRole("button", { name: "Close panel" }).click();
+      await page.getByRole("button", { name: "New card" }).click();
+      await page.getByLabel("Type").selectOption("docs-lite");
+      await page.getByLabel("Title").fill("CSV export");
+      await page.getByRole("button", { name: "Create in backlog" }).click();
+      const docsPanel = page.getByRole("complementary", { name: "Card WEB-2" });
+      await docsPanel.getByRole("button", { name: "Start" }).click();
+      await docsPanel
+        .getByRole("button", { name: "Approve & commit docs" })
+        .waitFor({ timeout: 30_000 });
+      await docsPanel.getByRole("tab", { name: /Doc changes/ }).click();
+      await expect
+        .poll(async () =>
+          (await docsPanel.locator(".diff .add").allTextContents()).map((t) => t.trim()),
+        )
+        .toContain("+# Guide for CSV export");
+      await shots("docs-review");
+      await docsPanel.getByRole("button", { name: "Approve & commit docs" }).click();
+      await expect
+        .poll(() => docsPanel.getByText("Approved and committed").count(), { timeout: 20_000 })
+        .toBe(1);
     } finally {
       await app.close();
     }

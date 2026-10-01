@@ -1,5 +1,6 @@
 export * from "./board.js";
 export * from "./context.js";
+export * from "./docs-context.js";
 export * from "./events.js";
 export * from "./thread-service.js";
 export * from "./workflow/definition.js";
