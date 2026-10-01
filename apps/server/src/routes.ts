@@ -164,6 +164,7 @@ export function factoryRoutes(f: FactoryServices, opts: { adminRole: string }) {
         path: z.string().min(1),
         defaultBranch: z.string().trim().optional(),
         checks: z.array(z.string().min(1)).default([]),
+        setup: z.array(z.string().min(1)).default([]),
       })
       .parse(await c.req.json());
     if (!(await f.board.getProduct(c.req.param("id")))) throw new NotFound("product");
@@ -178,6 +179,28 @@ export function factoryRoutes(f: FactoryServices, opts: { adminRole: string }) {
       defaultBranch: body.defaultBranch || found.defaultBranch,
     });
     return c.json(repoDto(repo), 201);
+  });
+
+  api.patch("/products/:id/repos/:repoId", adminOnly, async (c) => {
+    const body = z
+      .object({
+        name: z.string().min(1).optional(),
+        path: z.string().min(1).optional(),
+        defaultBranch: z.string().trim().min(1).optional(),
+        checks: z.array(z.string().min(1)).optional(),
+        setup: z.array(z.string().min(1)).optional(),
+      })
+      .parse(await c.req.json());
+    const existing = await f.board.getRepo(c.req.param("repoId"));
+    if (!existing || existing.productId !== c.req.param("id")) throw new NotFound("repo");
+    if (body.path) {
+      body.path = (
+        await f.runner.inspectRepo(body.path).catch((err: Error) => {
+          throw new BadRequest(err.message);
+        })
+      ).path;
+    }
+    return c.json(repoDto(await f.board.updateRepo(existing.id, body)));
   });
 
   // ── Plugins ────────────────────────────────────────────────────
@@ -485,6 +508,7 @@ const repoDto = (r: RepoDto): RepoDto => ({
   path: r.path,
   defaultBranch: r.defaultBranch,
   checks: r.checks,
+  setup: r.setup,
 });
 
 class NotFound extends Error {}

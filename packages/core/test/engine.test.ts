@@ -234,6 +234,42 @@ describe("WorkflowEngine", () => {
     });
     expect(await engine.recover()).toEqual([]);
   }, 60_000);
+
+  it("runs the repo's setup once per worktree; a failing setup blocks until retried", async () => {
+    const repo = await board.addRepo({
+      productId,
+      name: "web-setup",
+      path: repoPath,
+      defaultBranch: await git(repoPath, "branch", "--show-current"),
+      setup: ["exit 3"],
+    });
+    const card = await board.createCard({
+      productId,
+      repoId: repo.id,
+      type: "lite",
+      title: "Setup",
+    });
+    await engine.start(card.id);
+    await engine.whenIdle(card.id);
+    expect(await reload(card)).toMatchObject({ step: "triage", state: "blocked" });
+    expect((await board.events(card.id)).at(-1)?.payload).toMatchObject({
+      message: expect.stringContaining("Worktree setup failed: exit 3"),
+    });
+
+    await board.updateRepo(repo.id, {
+      setup: ["node -e \"require('fs').appendFileSync('setup.log','x')\""],
+    });
+    await engine.retry(card.id);
+    await engine.whenIdle(card.id);
+    const current = await reload(card);
+    expect(current.state).toBe("awaiting_gate");
+    await engine.decide(card.id, "approved");
+    await engine.whenIdle(card.id);
+    // Ran once, not again for the next step.
+    expect(await readFile(path.join(current.worktreePath as string, "setup.log"), "utf8")).toBe(
+      "x",
+    );
+  }, 60_000);
 });
 
 describe("shipped workflows", () => {

@@ -41,7 +41,11 @@ steps:                    # in order; a step advances to the next one when appro
 ## What happens in a step
 
 1. The card's worktree is created on first need (`factory/<key>-<title>` branch from the
-   repo's default branch). All steps of a card share it.
+   repo's default branch). All steps of a card share it. The repo's **setup** commands
+   (Products & repos, e.g. `pnpm install --frozen-lockfile --prefer-offline`) run once in
+   a new worktree before its first step; if one fails the card is blocked and Retry runs
+   the setup again. With pnpm, keep the store on the same drive as the worktrees so
+   installs hard-link instead of copying.
 2. **First entry:** a new thread is created and the rendered step prompt is sent to the
    step's agent. **Re-entry** (for example review → fix on "changes requested", or failed
    checks) *continues the same thread* with the new input, so the agent keeps its

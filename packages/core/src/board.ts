@@ -49,6 +49,7 @@ export class Board {
     path: string;
     defaultBranch?: string;
     checks?: string[];
+    setup?: string[];
   }): Promise<Repo> {
     const [row] = await this.db
       .insert(repos)
@@ -58,9 +59,19 @@ export class Board {
         path: input.path,
         defaultBranch: input.defaultBranch ?? "main",
         checks: input.checks ?? [],
+        setup: input.setup ?? [],
       })
       .returning();
     if (!row) throw new Error("failed to add repo");
+    return row;
+  }
+
+  async updateRepo(
+    id: string,
+    patch: Partial<Pick<Repo, "name" | "path" | "defaultBranch" | "checks" | "setup">>,
+  ): Promise<Repo> {
+    const [row] = await this.db.update(repos).set(patch).where(eq(repos.id, id)).returning();
+    if (!row) throw new Error(`unknown repo ${id}`);
     return row;
   }
 

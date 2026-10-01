@@ -10,6 +10,7 @@ import type {
   CardDetailDto,
   CardDto,
   ProductDto,
+  RepoDto,
   ThreadDetailDto,
   WorkflowDto,
 } from "@factory/protocol";
@@ -137,6 +138,20 @@ describe("factory API", () => {
       checks: ["test -f fixed.txt"],
     });
     expect(repo.status).toBe(201);
+    const repoId = (repo.json as RepoDto).id;
+    const edited = await call<RepoDto>(
+      "PATCH",
+      `/api/products/${product.json.id}/repos/${repoId}`,
+      { setup: ["git status"] },
+    );
+    expect(edited.json).toMatchObject({ setup: ["git status"], checks: ["test -f fixed.txt"] });
+    expect(
+      (
+        await call("PATCH", `/api/products/${product.json.id}/repos/${repoId}`, {
+          path: path.join(repoPath, "nope"),
+        })
+      ).status,
+    ).toBe(400);
 
     const created = await call<CardDto>("POST", `/api/products/${product.json.id}/cards`, {
       type: "lite",

@@ -577,6 +577,41 @@ export class WorkflowEngine {
 
   private async ensureWorktree(card: Card, repo: Repo | null): Promise<string> {
     if (!repo) return this.options.worktreesDir;
+    const worktreePath = await this.createWorktree(card, repo);
+    await this.setupWorktree(card, repo, worktreePath);
+    return worktreePath;
+  }
+
+  /**
+   * Runs the repo's setup commands (e.g. `pnpm install`) once per worktree, before its
+   * first step. A failure blocks the card; Retry runs the setup again.
+   */
+  private async setupWorktree(card: Card, repo: Repo, cwd: string): Promise<void> {
+    if (!repo.setup.length) return;
+    const events = await this.options.board.events(card.id);
+    const created = events.findLastIndex((e) => e.kind === "worktree_created");
+    const done = events.findLastIndex((e) => e.kind === "worktree_setup" && e.payload.ok === true);
+    if (done > created) return;
+    for (const command of repo.setup) {
+      const result = await this.options.runner.exec(command, cwd);
+      if (result.exitCode !== 0) {
+        await this.options.board.addEvent(card.id, "worktree_setup", "system", {
+          ok: false,
+          command,
+          exitCode: result.exitCode,
+        });
+        throw new Error(
+          `Worktree setup failed: ${command} (exit ${result.exitCode})\n${result.output.slice(-2000)}`,
+        );
+      }
+    }
+    await this.options.board.addEvent(card.id, "worktree_setup", "system", {
+      ok: true,
+      commands: repo.setup,
+    });
+  }
+
+  private async createWorktree(card: Card, repo: Repo): Promise<string> {
     if (card.worktreePath && card.branch) {
       await this.options.runner.ensureWorktree({
         repoPath: repo.path,
