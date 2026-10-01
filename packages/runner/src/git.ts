@@ -113,6 +113,26 @@ export async function deleteRefs(cwd: string, prefix: string): Promise<void> {
 }
 
 /**
+ * Whether `git worktree list --porcelain` output includes `worktreePath`. On Windows git
+ * prints C:/x/y while Node uses C:\\x\\y, and paths are case-insensitive.
+ */
+export function listsWorktree(
+  porcelain: string,
+  worktreePath: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  const win = platform === "win32";
+  const norm = (p: string) => {
+    const resolved = (win ? path.win32 : path.posix).resolve(p);
+    return win ? resolved.toLowerCase() : resolved;
+  };
+  const target = norm(worktreePath);
+  return porcelain
+    .split(/\r?\n/)
+    .some((l) => l.startsWith("worktree ") && norm(l.slice("worktree ".length)) === target);
+}
+
+/**
  * Creates (or reuses) a worktree at `worktreePath` on `branch`, branching from `base`.
  * Idempotent: if the worktree already exists it is left as is.
  */
@@ -123,7 +143,9 @@ export async function ensureWorktree(
   base: string,
 ): Promise<void> {
   const existing = await git(repoPath, ["worktree", "list", "--porcelain"]);
-  if (existing.split("\n").some((l) => l === `worktree ${path.resolve(worktreePath)}`)) return;
+  if (listsWorktree(existing, worktreePath)) return;
+  // Forget worktrees whose folder was deleted by hand, so their path can be reused.
+  await git(repoPath, ["worktree", "prune"]);
   const branchExists = await git(repoPath, [
     "rev-parse",
     "--verify",
