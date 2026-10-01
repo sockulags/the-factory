@@ -39,7 +39,7 @@ async function probe() {
   });
   const all = await loadAgents(values.config && fromUser(values.config));
   const wanted = (values.agents ?? "")
-    .split(",")
+    .split(/[\s,]+/)
     .map((s) => s.trim())
     .filter(Boolean);
   const specs = wanted.map((id) => {
