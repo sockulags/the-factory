@@ -254,8 +254,13 @@ export async function probeAgent(
   } finally {
     report.stderr = agent?.stderr || null;
     await agent?.close();
-    if (!options.keepWorkspace) await rm(workspace, { recursive: true, force: true });
-    else log(`workspace kept at ${workspace}`);
+    if (!options.keepWorkspace) {
+      // Windows can hold files briefly after a process exits; retry, and never let
+      // cleanup of a temp folder lose the report.
+      await rm(workspace, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }).catch(
+        (err: Error) => log(`could not remove ${workspace}: ${err.message}`),
+      );
+    } else log(`workspace kept at ${workspace}`);
   }
   return report;
 }

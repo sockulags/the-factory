@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable, Writable } from "node:stream";
@@ -23,6 +23,7 @@ import {
 } from "@agentclientprotocol/sdk";
 import type { AgentSpec } from "./agents.js";
 import { decidePermission, resolveInside, type SessionMode } from "./policy.js";
+import { killTree, spawnAgent } from "./spawn.js";
 
 export interface PermissionRecord {
   title: string;
@@ -83,13 +84,10 @@ export class AgentProcess {
     private readonly options: AgentProcessOptions,
   ) {
     this.spec = spec;
-    this.child = spawn(spec.command, spec.args, {
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, ...options.env, ...spec.env },
-      // Bare commands like npx are .cmd shims on Windows, which need a shell to launch.
-      // Absolute paths (which may contain spaces) are spawned directly.
-      shell: process.platform === "win32" && !path.isAbsolute(spec.command),
-      windowsHide: true,
+    this.child = spawnAgent(spec.command, spec.args, {
+      ...process.env,
+      ...options.env,
+      ...spec.env,
     });
     this.exited = new Promise((resolve) => {
       this.child.once("exit", (code, signal) => {
@@ -217,10 +215,10 @@ export class AgentProcess {
   async close(): Promise<void> {
     if (!this.exitInfo) {
       this.child.stdin?.end();
-      this.child.kill();
+      killTree(this.child);
       const timeout = new Promise((r) => setTimeout(r, 3000));
       await Promise.race([this.exited, timeout]);
-      if (!this.exitInfo) this.child.kill("SIGKILL");
+      if (!this.exitInfo) killTree(this.child, true);
     }
   }
 
