@@ -590,7 +590,9 @@ export class WorkflowEngine {
     if (!repo.setup.length) return;
     const events = await this.options.board.events(card.id);
     const created = events.findLastIndex((e) => e.kind === "worktree_created");
-    const done = events.findLastIndex((e) => e.kind === "worktree_setup" && e.payload.ok === true);
+    const done = events.findLastIndex(
+      (e) => e.kind === "worktree_setup" && (e.payload as { ok?: boolean }).ok === true,
+    );
     if (done > created) return;
     for (const command of repo.setup) {
       const result = await this.options.runner.exec(command, cwd);
