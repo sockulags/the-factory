@@ -18,6 +18,7 @@ export interface RepoDto {
   path: string;
   defaultBranch: string;
   checks: string[];
+  setup: string[];
 }
 
 export interface AgentDto {

@@ -49,6 +49,7 @@ export class Board {
     path: string;
     defaultBranch?: string;
     checks?: string[];
+    setup?: string[];
   }): Promise<Repo> {
     const [row] = await this.db
       .insert(repos)
@@ -58,9 +59,19 @@ export class Board {
         path: input.path,
         defaultBranch: input.defaultBranch ?? "main",
         checks: input.checks ?? [],
+        setup: input.setup ?? [],
       })
       .returning();
     if (!row) throw new Error("failed to add repo");
+    return row;
+  }
+
+  async updateRepo(
+    id: string,
+    patch: Partial<Pick<Repo, "name" | "path" | "defaultBranch" | "checks" | "setup">>,
+  ): Promise<Repo> {
+    const [row] = await this.db.update(repos).set(patch).where(eq(repos.id, id)).returning();
+    if (!row) throw new Error(`unknown repo ${id}`);
     return row;
   }
 
@@ -151,6 +162,12 @@ export class Board {
       .where(eq(cards.productId, productId))
       .orderBy(asc(cards.rank), asc(cards.number));
     return rows.map((r) => ({ ...r, key: `${product?.key ?? "?"}-${r.number}` }));
+  }
+
+  /** Cards in `state` across all products (e.g. the ones a restart left "running"). */
+  async cardsInState(state: string): Promise<Card[]> {
+    const rows = await this.db.select().from(cards).where(eq(cards.state, state));
+    return Promise.all(rows.map((r) => this.withKey(r)));
   }
 
   async updateCard(

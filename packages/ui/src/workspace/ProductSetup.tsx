@@ -1,4 +1,4 @@
-import type { ProductDto } from "@factory/protocol";
+import type { ProductDto, RepoDto } from "@factory/protocol";
 import { type FormEvent, useId, useState } from "react";
 import { errorMessage, useResource } from "../hooks.js";
 import { Integrations } from "./Integrations.js";
@@ -19,7 +19,10 @@ export function ProductSetup({
   const [productId, setProductId] = useState<string>(products[0]?.id ?? "");
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
-  const [repo, setRepo] = useState({ name: "", path: "", defaultBranch: "", checks: "" });
+  const blank = { name: "", path: "", defaultBranch: "", checks: "", setup: "" };
+  const [repo, setRepo] = useState(blank);
+  /** The repo being edited, or null when the form adds a new one. */
+  const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const repos = useResource(productId ? () => ctx.api.repos(productId) : null, productId);
   const ids = {
@@ -29,6 +32,22 @@ export function ProductSetup({
     rpath: useId(),
     rbranch: useId(),
     rchecks: useId(),
+    rsetup: useId(),
+  };
+  const lines = (text: string) =>
+    text
+      .split("\n")
+      .map((c) => c.trim())
+      .filter(Boolean);
+  const edit = (r: RepoDto) => {
+    setEditing(r.id);
+    setRepo({
+      name: r.name,
+      path: r.path,
+      defaultBranch: r.defaultBranch,
+      checks: r.checks.join("\n"),
+      setup: r.setup.join("\n"),
+    });
   };
 
   const createProduct = async (e: FormEvent) => {
@@ -44,22 +63,23 @@ export function ProductSetup({
       setError(errorMessage(err));
     }
   };
-  const addRepo = async (e: FormEvent) => {
+  const saveRepo = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      await ctx.api.addRepo(productId, {
+      const fields = {
         name:
           repo.name ||
           repo.path.replace(/["']/g, "").split(/[\\/]/).filter(Boolean).pop() ||
           "repo",
         path: repo.path,
         defaultBranch: repo.defaultBranch.trim() || undefined,
-        checks: repo.checks
-          .split("\n")
-          .map((c) => c.trim())
-          .filter(Boolean),
-      });
-      setRepo({ name: "", path: "", defaultBranch: "", checks: "" });
+        checks: lines(repo.checks),
+        setup: lines(repo.setup),
+      };
+      if (editing) await ctx.api.updateRepo(productId, editing, fields);
+      else await ctx.api.addRepo(productId, fields);
+      setRepo(blank);
+      setEditing(null);
       setError(null);
       await repos.reload();
     } catch (err) {
@@ -112,14 +132,18 @@ export function ProductSetup({
             {repos.data?.map((r) => (
               <li key={r.id}>
                 <strong>{r.name}</strong> <span className="muted">{r.path}</span> · base{" "}
-                {r.defaultBranch} · checks: {r.checks.join(" && ") || "none"}
+                {r.defaultBranch} · setup: {r.setup.join(" && ") || "none"} · checks:{" "}
+                {r.checks.join(" && ") || "none"}{" "}
+                <button type="button" className="ghost" onClick={() => edit(r)}>
+                  Edit
+                </button>
               </li>
             ))}
             {repos.data?.length === 0 && (
               <li className="muted">No repos yet. Cards need one to get a worktree.</li>
             )}
           </ul>
-          <form onSubmit={addRepo} className="form-grid">
+          <form onSubmit={saveRepo} className="form-grid">
             <label htmlFor={ids.rpath}>Path on the server</label>
             <input
               id={ids.rpath}
@@ -141,6 +165,14 @@ export function ProductSetup({
               onChange={(e) => setRepo({ ...repo, defaultBranch: e.target.value })}
               placeholder="detected from the repo"
             />
+            <label htmlFor={ids.rsetup}>Setup (one per line, runs in each new worktree)</label>
+            <textarea
+              id={ids.rsetup}
+              rows={2}
+              value={repo.setup}
+              onChange={(e) => setRepo({ ...repo, setup: e.target.value })}
+              placeholder="pnpm install --frozen-lockfile --prefer-offline"
+            />
             <label htmlFor={ids.rchecks}>Checks (one per line)</label>
             <textarea
               id={ids.rchecks}
@@ -149,9 +181,22 @@ export function ProductSetup({
               onChange={(e) => setRepo({ ...repo, checks: e.target.value })}
               placeholder={"pnpm lint\npnpm test"}
             />
-            <span />
+            {editing ? (
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setEditing(null);
+                  setRepo(blank);
+                }}
+              >
+                Cancel
+              </button>
+            ) : (
+              <span />
+            )}
             <button type="submit" disabled={!repo.path || !productId}>
-              Add repo
+              {editing ? "Save repo" : "Add repo"}
             </button>
           </form>
         </section>

@@ -36,6 +36,13 @@
       "when": 1790807914521,
       "tag": "0004_plugins",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790844604078,
+      "tag": "0005_repo_setup",
+      "breakpoints": true
     }
   ]
 }

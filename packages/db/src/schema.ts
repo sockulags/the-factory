@@ -99,6 +99,8 @@ export const repos = pgTable("repos", {
   defaultBranch: text("default_branch").notNull().default("main"),
   /** Commands the `checks` gate runs in the worktree, e.g. ["pnpm test"]. */
   checks: jsonb("checks").$type<string[]>().notNull().default([]),
+  /** Commands run once in each new card worktree before its first step, e.g. ["pnpm install"]. */
+  setup: jsonb("setup").$type<string[]>().notNull().default([]),
 });
 
 /**
