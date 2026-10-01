@@ -70,6 +70,22 @@ describe("probeAgent", () => {
     expect(report.checks.readOnly.detail).toContain("created anyway");
   }, 60_000);
 
+  it("uses the agent's own read-only mode for agents that write without asking", async () => {
+    const report = await probe(
+      await fakeAgent({
+        FAKE_DIRECT: "1",
+        FAKE_NO_PERMISSION: "1",
+        FAKE_LOAD: "1",
+        FAKE_MODES: "auto,read-only",
+      }),
+    );
+    expect(report.checks.readOnly.status).toBe("pass");
+    expect(report.checks.readOnly.detail).toContain('agent mode "read-only"');
+    // …and goes back to its normal mode for writing.
+    expect(report.checks.write.status).toBe("pass");
+    expect(report.checks.cancel.status).toBe("pass");
+  }, 60_000);
+
   it("stops with a login hint when the agent is not signed in", async () => {
     const spec = { ...(await fakeAgent({ FAKE_AUTH: "1" })), loginHint: "Run `fake login`." };
     const report = await probe(spec);

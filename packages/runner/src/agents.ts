@@ -9,6 +9,12 @@ export interface AgentSpec {
   env?: Record<string, string>;
   /** Shown when the agent reports it isn't signed in. */
   loginHint?: string;
+  /**
+   * The agent's own session modes to use per turn mode. By default a mode whose id
+   * looks like "read-only" is used for consult turns, and the session's normal mode
+   * for write turns. Needed for agents that write without asking for permission.
+   */
+  modes?: { consult?: string; write?: string };
 }
 
 /**

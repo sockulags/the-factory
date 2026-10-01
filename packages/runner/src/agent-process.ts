@@ -15,6 +15,7 @@ import {
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type ResumeSessionResponse,
+  type SessionModeState,
   type SessionNotification,
   type SessionUpdate,
   type StopReason,
@@ -50,6 +51,11 @@ export interface TurnResult {
 interface SessionState {
   cwd: string;
   mode: SessionMode;
+  /** The agent's own modes for this session (ACP session modes), if it has any. */
+  agentModes: string[];
+  /** The agent's mode when the session was opened: what write turns go back to. */
+  baseAgentMode: string | null;
+  currentAgentMode: string | null;
   turn: TurnResult | null;
   /** Updates received outside a prompt, e.g. history replay during session/load. */
   background: SessionUpdate[];
@@ -133,7 +139,10 @@ export class AgentProcess {
     mcpServers: McpServer[] = [],
   ): Promise<NewSessionResponse> {
     const res = await this.guard(this.connection.newSession({ cwd, mcpServers }));
-    this.sessions.set(res.sessionId, { cwd, mode, turn: null, background: [] });
+    const state = this.newState(cwd, mode);
+    this.sessions.set(res.sessionId, state);
+    this.recordModes(state, res.modes);
+    await this.applyAgentMode(res.sessionId, state);
     return res;
   }
 
@@ -144,9 +153,11 @@ export class AgentProcess {
     mode: SessionMode,
     mcpServers: McpServer[] = [],
   ): Promise<{ response: LoadSessionResponse | undefined; replayed: SessionUpdate[] }> {
-    const state: SessionState = { cwd, mode, turn: null, background: [] };
+    const state = this.newState(cwd, mode);
     this.sessions.set(sessionId, state);
     const response = await this.guard(this.connection.loadSession({ sessionId, cwd, mcpServers }));
+    this.recordModes(state, response?.modes);
+    await this.applyAgentMode(sessionId, state);
     return { response: response ?? undefined, replayed: state.background };
   }
 
@@ -157,13 +168,67 @@ export class AgentProcess {
     mode: SessionMode,
     mcpServers: McpServer[] = [],
   ): Promise<ResumeSessionResponse> {
-    this.sessions.set(sessionId, { cwd, mode, turn: null, background: [] });
-    return this.guard(this.connection.resumeSession({ sessionId, cwd, mcpServers }));
+    const state = this.newState(cwd, mode);
+    this.sessions.set(sessionId, state);
+    const response = await this.guard(
+      this.connection.resumeSession({ sessionId, cwd, mcpServers }),
+    );
+    this.recordModes(state, response.modes);
+    await this.applyAgentMode(sessionId, state);
+    return response;
   }
 
-  setMode(sessionId: string, mode: SessionMode): void {
+  /**
+   * Sets the turn mode. Our permission policy enforces it for agents that ask before
+   * acting; for agents with their own read-only mode we also switch the agent's mode,
+   * since some agents (e.g. Codex) write without asking.
+   */
+  async setMode(sessionId: string, mode: SessionMode): Promise<void> {
     const state = this.requireSession(sessionId);
     state.mode = mode;
+    await this.applyAgentMode(sessionId, state);
+  }
+
+  /** The agent's own session mode currently in effect, if it has modes. */
+  agentMode(sessionId: string): string | null {
+    return this.sessions.get(sessionId)?.currentAgentMode ?? null;
+  }
+
+  private newState(cwd: string, mode: SessionMode): SessionState {
+    return {
+      cwd,
+      mode,
+      agentModes: [],
+      baseAgentMode: null,
+      currentAgentMode: null,
+      turn: null,
+      background: [],
+    };
+  }
+
+  private recordModes(state: SessionState, modes: SessionModeState | null | undefined): void {
+    if (!modes) return;
+    state.agentModes = modes.availableModes.map((m) => m.id);
+    state.currentAgentMode = modes.currentModeId;
+    // If the session was left in a read-only mode, don't treat that as its normal mode.
+    state.baseAgentMode = isReadOnlyMode(modes.currentModeId)
+      ? (state.agentModes.find((id) => !isReadOnlyMode(id)) ?? null)
+      : modes.currentModeId;
+  }
+
+  private agentModeFor(state: SessionState): string | null {
+    const has = (id: string | undefined) => (id && state.agentModes.includes(id) ? id : null);
+    if (state.mode === "read-only") {
+      return has(this.spec.modes?.consult) ?? state.agentModes.find(isReadOnlyMode) ?? null;
+    }
+    return has(this.spec.modes?.write) ?? state.baseAgentMode;
+  }
+
+  private async applyAgentMode(sessionId: string, state: SessionState): Promise<void> {
+    const target = this.agentModeFor(state);
+    if (!target || target === state.currentAgentMode) return;
+    await this.guard(this.connection.setSessionMode({ sessionId, modeId: target }));
+    state.currentAgentMode = target;
   }
 
   async setAgentMode(sessionId: string, modeId: string): Promise<void> {
@@ -282,6 +347,8 @@ export class AgentProcess {
     this.options.onUpdate?.(sessionId, update);
     const state = this.sessions.get(sessionId);
     if (!state) return;
+    if (update.sessionUpdate === "current_mode_update")
+      state.currentAgentMode = update.currentModeId;
     const turn = state.turn;
     if (!turn) {
       state.background.push(update);
@@ -317,3 +384,5 @@ export class AgentProcess {
     return { outcome: decision };
   }
 }
+
+const isReadOnlyMode = (id: string) => /read[-_ ]?only/i.test(id);
