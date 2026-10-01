@@ -1,6 +1,6 @@
 # The Factory — Plan
 
-Status: draft, living document. Last updated 2026-09-30 (rev 10).
+Status: draft, living document. Last updated 2026-09-30 (rev 11).
 
 ## 1. What we're building
 
@@ -303,8 +303,14 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
    GitHub and GitLab (`vcs.open_pr`: push + PR/MR + card link), MCP (e.g.
    Jira/Confluence via Atlassian's MCP server), instructions, webhook. See
    [plugins.md](plugins.md).
-7. **Team & ops.** Roles, multi-product views, usage dashboards, k8s
-   deployment (runner as pod, worktrees on volumes), desktop runner mode.
+7. **Team & ops.**
+   - 7a ✅ *Built.* Admin role (`ADMIN_ROLE`, default `factory-admin` in
+     Keycloak) gates products, repos and integrations; everyone works cards.
+     Usage view: turns, tokens, reported cost and agent time by agent, card
+     and day, per product or overall.
+   - 7b: standalone runner service (runner protocol over the network) for a
+     runner pod on Kubernetes, k8s manifests; later the desktop runner for
+     personal subscriptions.
 
 ## 7. Open questions
 

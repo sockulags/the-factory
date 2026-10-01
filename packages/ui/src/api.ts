@@ -11,6 +11,7 @@ import type {
   ThreadDetailDto,
   ThreadSummaryDto,
   TurnMode,
+  UsageReportDto,
   WorkflowDto,
 } from "@factory/protocol";
 
@@ -40,6 +41,8 @@ export function createApi(bridge: DesktopBridge) {
         enabled,
         config,
       }),
+    usage: (productId: string | null, days: number) =>
+      get<UsageReportDto>(`/usage?days=${days}${productId ? `&productId=${productId}` : ""}`),
     cards: (productId: string) => get<CardDto[]>(`/products/${productId}/cards`),
     createCard: (productId: string, card: { type: string; title: string; body: string }) =>
       post<CardDto>(`/products/${productId}/cards`, card),

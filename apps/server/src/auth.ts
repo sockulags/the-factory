@@ -98,7 +98,7 @@ export function createDevAuthenticator(devToken: string): Authenticator {
       username: "dev",
       name: "Developer",
       email: null,
-      roles: ["admin"],
+      roles: ["factory-admin"],
     };
   };
 }

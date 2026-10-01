@@ -4,6 +4,7 @@ export * from "./docs-context.js";
 export * from "./events.js";
 export * from "./plugins/index.js";
 export * from "./thread-service.js";
+export * from "./usage.js";
 export * from "./workflow/definition.js";
 export * from "./workflow/engine.js";
 export * from "./workflow/handover.js";

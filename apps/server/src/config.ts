@@ -30,6 +30,9 @@ const Env = z
     AGENTS_CONFIG: z.string().optional(),
     TURN_TIMEOUT_MINUTES: z.coerce.number().positive().default(30),
 
+    /** Keycloak realm or client role that may manage products, repos and integrations. */
+    ADMIN_ROLE: z.string().default("factory-admin"),
+
     MIN_CLIENT_VERSION: z.string().default("0.0.0"),
     UPDATES_DIR: z.string().default("./updates"),
     UPDATE_CHANNELS: csv.default(["stable", "beta"]),

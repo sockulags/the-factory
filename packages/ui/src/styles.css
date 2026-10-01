@@ -664,3 +664,50 @@ ul.plain {
   padding: 1px 8px;
   text-decoration: none;
 }
+.usage {
+  overflow-y: auto;
+  max-width: 1100px;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tile strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+table.data {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+table.data th,
+table.data td {
+  text-align: right;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+table.data th:first-child,
+table.data td:first-child {
+  text-align: left;
+}
+.views {
+  display: flex;
+  gap: 2px;
+}
+.ghost.active {
+  border-color: var(--border);
+  background: var(--surface-2);
+}

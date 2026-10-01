@@ -106,6 +106,14 @@ describe("board (e2e)", () => {
       await expect
         .poll(() => docsPanel.getByText("Approved and committed").count(), { timeout: 20_000 })
         .toBe(1);
+
+      // Usage: every agent turn so far is counted.
+      await page.getByRole("button", { name: "Usage" }).click();
+      const usage = page.getByRole("region", { name: "Usage" });
+      await usage.getByText("Agent turns").waitFor();
+      const turns = Number(await usage.locator(".tile strong").first().textContent());
+      expect(turns).toBeGreaterThan(5);
+      await shots("usage");
     } finally {
       await app.close();
     }
