@@ -37,7 +37,7 @@ async function main() {
   await handle.migrate();
 
   const all = await loadAgents(values.config && path.resolve(userCwd, values.config));
-  const wanted = (values.agents ?? "").split(",").map((s) => s.trim());
+  const wanted = (values.agents ?? "").split(/[\s,]+/).map((s) => s.trim());
   const agents = all.filter((a) => wanted.includes(a.id));
   const runner = new LocalRunner(agents);
   const service = new ThreadService({ db: handle.db, runner, turnTimeoutMs: 15 * 60_000 });

@@ -8,3 +8,4 @@ export * from "./probe.js";
 export * from "./remote.js";
 export * from "./report.js";
 export * from "./runner.js";
+export * from "./spawn.js";
