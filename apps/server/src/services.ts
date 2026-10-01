@@ -1,3 +1,4 @@
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import {
   Board,
@@ -83,12 +84,15 @@ export async function createFactoryServices(opts: {
       return card ? plugins.mcpServersFor(card.productId) : [];
     },
   });
+  // Cards without a repo run here, so it must exist before the first agent starts.
+  const worktreesDir = path.resolve(config.WORKTREES_DIR);
+  mkdirSync(worktreesDir, { recursive: true });
   const engine = new WorkflowEngine({
     board,
     threads,
     runner,
     workflows,
-    worktreesDir: path.resolve(config.WORKTREES_DIR),
+    worktreesDir,
     resolveHook: (card, name) => plugins.resolveHook(card, name),
     instructionsFor: (card) => plugins.instructionsFor(card.productId),
     onCardChange: (id) => bus.cardChanged(id),

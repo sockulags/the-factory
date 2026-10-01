@@ -1,18 +1,56 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
 
+const isDir = (p: string) =>
+  stat(p).then(
+    (s) => s.isDirectory(),
+    () => false,
+  );
+
 async function git(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string> {
-  const { stdout } = await exec("git", args, {
-    cwd,
-    env: { ...process.env, ...env },
-    maxBuffer: 32 * 1024 * 1024,
-  });
-  return stdout.trim();
+  try {
+    const { stdout } = await exec("git", args, {
+      cwd,
+      env: { ...process.env, ...env },
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    return stdout.trim();
+  } catch (err) {
+    // Node reports a missing working directory as "spawn git ENOENT" too; say which it is.
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(
+        (await isDir(cwd))
+          ? "git was not found: install Git and make sure it is on PATH"
+          : `folder not found: ${cwd}`,
+      );
+    }
+    throw err;
+  }
+}
+
+/**
+ * Checks that `input` is a git repository and returns its root and default branch
+ * (origin's HEAD if known, else the checked-out branch). Tolerates pasted quotes.
+ */
+export async function inspectRepo(input: string): Promise<{ path: string; defaultBranch: string }> {
+  const dir = path.resolve(input.trim().replace(/^(["'])(.*)\1$/, "$2"));
+  if (!(await isDir(dir))) throw new Error(`folder not found: ${dir}`);
+  if (!(await isGitRepo(dir))) throw new Error(`not a git repository: ${dir}`);
+  const root = path.resolve(await git(dir, ["rev-parse", "--show-toplevel"]));
+  const originHead = await git(root, [
+    "symbolic-ref",
+    "-q",
+    "--short",
+    "refs/remotes/origin/HEAD",
+  ]).catch(() => "");
+  const current = await git(root, ["symbolic-ref", "-q", "--short", "HEAD"]).catch(() => "");
+  const defaultBranch = originHead.replace(/^origin\//, "") || current || "main";
+  return { path: root, defaultBranch };
 }
 
 export async function isGitRepo(cwd: string): Promise<boolean> {

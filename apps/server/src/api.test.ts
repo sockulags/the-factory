@@ -124,6 +124,13 @@ describe("factory API", () => {
     const product = await call<ProductDto>("POST", "/api/products", { key: "app", name: "App" });
     expect(product).toMatchObject({ status: 201, json: { key: "APP" } });
     expect((await call("POST", "/api/products", { key: "APP", name: "Dup" })).status).toBe(400);
+    const wrong = await call<{ detail?: string; error?: string }>(
+      "POST",
+      `/api/products/${product.json.id}/repos`,
+      { name: "app", path: path.join(repoPath, "does-not-exist") },
+    );
+    expect(wrong.status).toBe(400);
+    expect(JSON.stringify(wrong.json)).toContain("folder not found");
     const repo = await call("POST", `/api/products/${product.json.id}/repos`, {
       name: "app",
       path: repoPath,
