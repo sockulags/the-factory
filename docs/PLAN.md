@@ -1,6 +1,6 @@
 # The Factory — Plan
 
-Status: draft, living document. Last updated 2026-09-30 (rev 11).
+Status: draft, living document. Last updated 2026-09-30 (rev 12).
 
 ## 1. What we're building
 
@@ -308,9 +308,11 @@ agents(id, name, command, args, env_ref)   -- ACP agent registry
      Keycloak) gates products, repos and integrations; everyone works cards.
      Usage view: turns, tokens, reported cost and agent time by agent, card
      and day, per product or overall.
-   - 7b: standalone runner service (runner protocol over the network) for a
-     runner pod on Kubernetes, k8s manifests; later the desktop runner for
-     personal subscriptions.
+   - 7b ✅ *Built.* Runner protocol over HTTP (JSON RPC; prompts stream
+     NDJSON updates) with a shared token; `apps/runner` service and image; the
+     server uses it when `RUNNER_URL` is set (in-process otherwise).
+     Kubernetes manifests (`deploy/k8s`). Later: the desktop runner for
+     personal subscriptions (same protocol, one runner per person).
 
 ## 7. Open questions
 

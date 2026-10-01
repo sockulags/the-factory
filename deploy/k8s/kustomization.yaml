@@ -1,0 +1,15 @@
+# kubectl apply -k deploy/k8s   (after creating the secrets described in README.md)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: factory
+resources:
+  - namespace.yaml
+  - server.yaml
+  - runner.yaml
+images:
+  - name: factory-server
+    newName: ghcr.io/sockulags/the-factory-server
+    newTag: latest
+  - name: factory-runner
+    newName: ghcr.io/sockulags/the-factory-runner
+    newTag: latest
