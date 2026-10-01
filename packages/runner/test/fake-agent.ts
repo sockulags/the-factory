@@ -7,6 +7,8 @@
 //   FAKE_DIRECT=1    write files itself instead of via the client (ignores read-only)
 //   FAKE_NO_PERMISSION=1  never ask for permission before editing
 //   FAKE_AUTH=1      reject prompts with auth_required
+//   FAKE_MODES=a,b   session modes offered (default: default,plan); a mode named
+//                    "read-only" makes the agent refuse to write files itself
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable, Writable } from "node:stream";
@@ -24,6 +26,7 @@ interface Stored {
   cwd: string;
   history: { role: "user" | "agent"; text: string }[];
   memory: Record<string, string>;
+  mode?: string;
 }
 
 const env = process.env;
@@ -64,14 +67,12 @@ const connection = new AgentSideConnection(
       async newSession({ cwd }) {
         const sessionId = `s-${Math.random().toString(36).slice(2, 10)}`;
         await save(sessionId, { cwd, history: [], memory: {} });
+        const ids = (env.FAKE_MODES ?? "default,plan").split(",");
         return {
           sessionId,
           modes: {
-            currentModeId: "default",
-            availableModes: [
-              { id: "default", name: "Default" },
-              { id: "plan", name: "Plan" },
-            ],
+            currentModeId: ids[0] ?? "default",
+            availableModes: ids.map((id) => ({ id, name: id })),
           },
         };
       },
@@ -95,7 +96,10 @@ const connection = new AgentSideConnection(
       async authenticate() {
         return {};
       },
-      async setSessionMode() {
+      async setSessionMode({ sessionId, modeId }) {
+        const s = await load(sessionId);
+        s.mode = modeId;
+        await save(sessionId, s);
         return {};
       },
       async cancel({ sessionId }) {
@@ -173,6 +177,7 @@ const connection = new AgentSideConnection(
             allowed = res.outcome.outcome === "selected" && res.outcome.optionId !== "no";
           }
           if (!allowed) reply = "Permission denied, not writing.";
+          else if (s.mode === "read-only") reply = "I'm in read-only mode, not writing.";
           else if (env.FAKE_DIRECT === "1" || !clientCaps.fs?.writeTextFile) {
             await writeFile(target, content);
             reply = `Wrote ${name}.`;

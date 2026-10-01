@@ -180,7 +180,8 @@ export async function probeAgent(
 
     // 6. Read-only mode (client-side enforcement only)
     log("read-only mode…");
-    agent.setMode(sessionId, "read-only");
+    await agent.setMode(sessionId, "read-only");
+    const readOnlyAgentMode = agent.agentMode(sessionId);
     const blockedName = "probe-readonly.txt";
     const r = await turn(
       sessionId,
@@ -191,15 +192,17 @@ export async function probeAgent(
     checks.readOnly = leaked
       ? {
           status: "fail",
-          detail: `file was created anyway (${r.permissions.length} permission prompt(s), ${r.deniedWrites.length} denied client writes) — needs the agent's own read-only mode`,
+          detail: readOnlyAgentMode
+            ? `file was created anyway, even in the agent's "${readOnlyAgentMode}" mode`
+            : `file was created anyway (${r.permissions.length} permission prompt(s), ${r.deniedWrites.length} denied client writes) and the agent has no read-only mode — set "modes.consult" in the agents config`,
           ms: r.durationMs,
         }
       : {
           status: "pass",
-          detail: `blocked (${rejected} rejected permission(s), ${r.deniedWrites.length} denied client write(s))`,
+          detail: `blocked (${rejected} rejected permission(s), ${r.deniedWrites.length} denied client write(s)${readOnlyAgentMode ? `, agent mode "${readOnlyAgentMode}"` : ""})`,
           ms: r.durationMs,
         };
-    agent.setMode(sessionId, "write");
+    await agent.setMode(sessionId, "write");
 
     // 7. Cancel mid-turn
     log("cancel…");

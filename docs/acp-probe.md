@@ -50,8 +50,11 @@ It sends about seven short prompts per agent, so it costs a few cents of usage.
 - **Resume works** → keep native sessions, send only deltas (the planned design).
 - **Resume missing or broken** → for that agent, start a new session per turn batch,
   seeded with the step handover plus a recent tail of the thread log.
-- **Read-only fails** → map "consult" to the agent's own read-only mode (listed under
-  *Agent modes*) and re-probe, or run consultants on a disposable copy of the worktree.
+- **Read-only fails** → the runner switches agents into their own read-only mode for
+  consult turns automatically: any mode whose id contains "read-only" (Codex). If the
+  agent calls it something else, set it in an agents config file,
+  `[{ "id": "codex", "modes": { "consult": "<mode id>" } }]`, and pass `--config`.
+  The mode ids are listed under *Agent modes* in the report.
 - **Writes bypass client fs** → compute "what changed" from git checkpoints only
   (planned anyway) rather than from fs callbacks.
 - **No usage** → meter turns and time for that agent.

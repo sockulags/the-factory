@@ -109,7 +109,7 @@ export class LocalRunner implements Runner {
     const agent = await this.process(agentId);
     const live = this.live(agentId);
     if (existingSessionId && live.has(existingSessionId)) {
-      agent.setMode(existingSessionId, mode);
+      await agent.setMode(existingSessionId, mode);
       return { sessionId: existingSessionId, origin: "live" as const };
     }
     if (existingSessionId) {
@@ -136,7 +136,7 @@ export class LocalRunner implements Runner {
 
   async prompt(req: Parameters<Runner["prompt"]>[0]): Promise<TurnResult> {
     const agent = await this.process(req.agentId);
-    agent.setMode(req.sessionId, req.mode);
+    await agent.setMode(req.sessionId, req.mode);
     if (req.onUpdate) this.listeners.set(req.sessionId, req.onUpdate);
     try {
       return await agent.prompt(req.sessionId, req.text, { timeoutMs: req.timeoutMs });
